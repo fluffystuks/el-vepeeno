@@ -5,7 +5,7 @@ import uuid
 import random
 import string
 from datetime import datetime, timedelta
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, MenuButtonCommands
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
 
 # Файл для хранения данных
@@ -21,7 +21,12 @@ SESSION_KEY = None
 def load_user_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as file:
-            return json.load(file)
+            data = json.load(file)
+            # Добавляем поле balance, если его нет
+            for user_id in data:
+                if "balance" not in data[user_id]:
+                    data[user_id]["balance"] = 0
+            return data
     return {}
 
 # Функция сохранения данных
@@ -65,18 +70,19 @@ def generate_client():
 def get_client_link(client_id, user_id: str):
     return f"vless://{client_id}@109.120.184.34:433?type=tcp&security=reality&pbk=eFC-ougLLf7VNPSagv1C1CHP8jBGvzVSGLmfww-9Cyg&fp=firefox&sni=www.ign.com&sid=14b4b5a9cbd5&spx=%2F#Buyers-{user_id}"
 
-# Функция генерации ключа
-# Функция генерации ключа
-def generate_key(user_id):
+def generate_key(user_id, duration_days):
     if not SESSION_KEY:
         return "❌ Ошибка авторизации в API."
 
     client = generate_client()
     client_id = client.get('id')
 
-    expiry_datetime = datetime.utcnow() + timedelta(days=3, hours=3)
-    expiry_time_str = expiry_datetime.strftime("%Y-%m-%d %H:%M")  # Сохраняем дату с временем в формате YYYY-MM-DD HH:MM
-    client["expiryTime"] = expiry_time_str
+    # Генерация срока действия без учета часового пояса
+    utc_now = datetime.utcnow()
+    expiry_datetime = utc_now + timedelta(days=duration_days, hours=3)
+    
+    expiry_timestamp = int(expiry_datetime.timestamp() * 1000)
+    client["expiryTime"] = expiry_timestamp
 
     payload = {
         "id": 2,
@@ -94,153 +100,343 @@ def generate_key(user_id):
         if response.status_code == 200 and response.json().get("success"):
             link = get_client_link(client_id, client['email'])
             
-            # Сохраняем email, срок действия и статус пробного периода в структуру данных пользователя
             if user_id not in user_data:
                 user_data[user_id] = {}
 
-            # Обновляем данные пользователя: добавляем пробный период и срок действия
-            user_data[user_id]["email"] = client['email']
-            user_data[user_id]["expiryTime"] = expiry_time_str
-            user_data[user_id]["trial_used"] = True  # Отмечаем, что пробной период использован
-
+            user_data[user_id].update({
+                "email": client['email'],
+                "expiryTime": expiry_datetime.strftime("%d-%m-%Y %H:%M"),
+                "trial_used": user_data[user_id].get("trial_used", False),
+                "key": link
+            })
             save_user_data(user_data)
 
-            return f"🔑 Ключ успешно создан!\n📧 Email: {client['email']}\n🔗 Ссылка: {link}"
+            return f"📧 Email: {client['email']}\n🔑 Ключ: {link}"
         else:
             return f"❌ Ошибка при генерации ключа: {response.text}"
     except Exception as e:
         return f"❌ Ошибка соединения с API: {e}"
 
-# Функция обработки команды /start
+async def set_bot_commands(application):
+    await application.bot.set_my_commands([
+        BotCommand("start", "Запустить бота")
+    ])
+
+async def post_init(application: Application):
+    await application.bot.set_my_commands([
+        ("start", "Запустить бота"),
+        ("pay", "Пополнить баланс"),
+        ("balance", "Показать баланс")
+    ])
+    
+    # Устанавливаем кнопку "Меню"
+    await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+
+
+async def pay(update, context):
+    text = (
+        "💳 *Пополнение баланса*\n\n"
+        "Чтобы пополнить баланс нужно сделать сальто и не смотреть под подушку:\n"
+        "👉 +7 (XXX) XXX-XX-XX\n\n"
+        "После оплаты отправьте скриншот чека сюда: [@othrwise](https://t.me/othrwise).\n"
+        "Мы зачислим средства на ваш баланс в течение 15 минут."
+    )
+    
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+async def balance(update, context):
+    user_id = str(update.message.from_user.id)
+    
+    if user_id not in user_data:
+        user_data[user_id] = {"balance": 0}
+        save_user_data(user_data)
+    
+    balance_amount = user_data[user_id].get("balance", 0)
+    
+    text = (
+        "💰 *Ваш баланс:*\n"
+        f"{balance_amount} рублей\n\n"
+        "Чтобы пополнить баланс, используйте команду /pay."
+    )
+    
+    await update.message.reply_text(text, parse_mode="Markdown")
+
 async def start(update, context):
     keyboard = [
-        [InlineKeyboardButton("Подключить", callback_data='connect')],
-        [InlineKeyboardButton("Инструкция по подключению", callback_data='instruction')],
-        [InlineKeyboardButton("Мой аккаунт", callback_data='account')],
-        [InlineKeyboardButton("Помощь", callback_data='help')],
+        [InlineKeyboardButton("🔗 Подключить", callback_data='connect')],
+        [InlineKeyboardButton("📜 Инструкция по подключению", callback_data='instruction')],
+        [InlineKeyboardButton("👤 Мой аккаунт", callback_data='account')],
+        [InlineKeyboardButton("🤓Помощь", callback_data='help')],
     ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Добро пожаловать! Выберите один из вариантов:', reply_markup=reply_markup)
+    
+    text = (
+        "🌟 *Добро пожаловать!* 🌟\n\n"
+        "Выберите один из вариантов ниже:\n"
+    )
+    
+    if update.message:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    else:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
-# Функция обработки кнопки "Инструкция по подключению"
 async def handle_instruction(update, context):
     await update.callback_query.answer()
-    await update.callback_query.message.edit_text(
-        "📜 **Инструкция по подключению для всех устройств:**\n"
-        "👉 [Открыть инструкцию](https://telegra.ph/Instrukciya-po-ispolzovaniyu-klyucha-BLESS-01-30)",
+    text = (
+        "📜 *Инструкция по подключению для всех устройств:*\n\n"
+        "👉 [Подробная инструкция](https://telegra.ph/Instrukciya-po-ispolzovaniyu-klyucha-BLESS-01-30)"
+    )
+    
+    await update.callback_query.edit_message_text(
+        text,
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([ 
             [InlineKeyboardButton("🔙 Назад", callback_data="back")]
         ])
     )
 
-# Функция обработки выбора "Подключить"
 async def handle_connect(update, context):
     user_id = str(update.callback_query.from_user.id)
     trial_disabled = user_data.get(user_id, {}).get("trial_used", False)
 
     keyboard = [
-        [InlineKeyboardButton("Пробный - 3 дня", callback_data='trial')] if not trial_disabled else [],
-        [InlineKeyboardButton("100 рублей - 1 месяц", callback_data='100rub')],
-        [InlineKeyboardButton("500 рублей - 6 месяцев", callback_data='500rub')],
-        [InlineKeyboardButton("Назад", callback_data='back')],
+        [InlineKeyboardButton("🆓 Пробный - 3 дня", callback_data='trial')] if not trial_disabled else [],
+        [InlineKeyboardButton("💳 100 рублей - 1 месяц", callback_data='100rub')],
+        [InlineKeyboardButton("💳 250 рублей - 3 месяца", callback_data='250rub')],
+        [InlineKeyboardButton("💳 500 рублей - 6 месяцев", callback_data='500rub')],
+        [InlineKeyboardButton("🔙 Назад", callback_data='back')],
     ]
     
     keyboard = [row for row in keyboard if row]  # Убираем пустые строки
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.callback_query.message.edit_text('Выберите тариф для подключения:', reply_markup=reply_markup)
+    text = (
+        "💡 *Выберите тариф для подключения:*"
 
-# Функция обработки выбора тарифа
+    )
+    
+    await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
 async def handle_tariff(update, context):
     query = update.callback_query
     user_id = str(query.from_user.id)
     choice = query.data
 
     if user_id not in user_data:
-        user_data[user_id] = {}
+        user_data[user_id] = {"balance": 0}
+        save_user_data(user_data)
 
     if choice == 'trial':
-        # Проверяем, использовал ли пользователь пробный период
         if user_data[user_id].get("trial_used", False):
             await query.answer("Вы уже использовали пробный период!", show_alert=True)
             return
         
-        # Отмечаем, что пробный период был использован
         user_data[user_id]["trial_used"] = True
-
-        # Генерируем ключ для пользователя
-        key_info = generate_key(user_id)
-
-        # Сохраняем обновленные данные пользователя в users.json
         save_user_data(user_data)
 
-        await query.edit_message_text(f"Вы выбрали тариф 'Пробный - 3 дня'.\n\n{key_info}")
+        # Для пробного периода срок действия - 3 дня
+        key_info = generate_key(user_id, duration_days=3)  # Передаем 3 дня для пробного периода
+        key = user_data[user_id].get("key", "Не найдено")
+
+        text = (
+            "🎉 *Поздравляем! Вы успешно активировали пробный период.* 🎉\n\n"
+            f" *Ваш ключ:*\n`{key}`\n\n"
+            "\n*Нажмите на ключ, чтобы его скопировать*\n\n"
+            "📝 *Что делать дальше?*\n"
+            "1. Скачайте приложение Streisand - если у Вас IOS. Hiddify,V2RayNG - Если у Вас Android.\n"
+            "2. Нажмите кнопку *Добавить ключ*.\n"
+            "3. Вставьте ваш ключ и нажмите *Подключить*.\n"
+            "4. Готово! Теперь вы защищены. 🛡️\n\n"
+            "⏳ *Срок действия пробного периода:* 3 дня\n\n"
+            "📜 Если возникнут вопросы, воспользуйтесь разделом *Помощь*."
+        )
+
+        await query.edit_message_text(
+            text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📜 Инструкция по подключению", callback_data='instruction')],
+                [InlineKeyboardButton("🤓 Помощь", callback_data='help')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='back')]
+            ])
+        )
     
     elif choice == '100rub':
-        await query.edit_message_text('Вы выбрали тариф "100 рублей - 1 месяц".')
-    
+        if user_data[user_id].get("balance", 0) < 100:
+            await query.answer("❌ Недостаточно средств на балансе. Пополните баланс через /pay.", show_alert=True)
+            return
+        
+        user_data[user_id]["balance"] -= 100
+        save_user_data(user_data)
+
+        # Для тарифа на 1 месяц срок действия - 30 дней
+        key_info = generate_key(user_id, duration_days=30)  # Передаем 30 дней для тарифа на 1 месяц
+        key = user_data[user_id].get("key", "Не найдено")
+        
+        text = (
+            "🎉 *Вы успешно активировали тариф на 1 месяц!* 🎉\n\n"
+            f"🔑 *Ваш ключ:*\n`{key}`\n\n"
+            "\n*Нажмите на ключ, чтобы его скопировать*\n\n"
+            "📝 *Что делать дальше?*\n"
+            "1. Скачайте приложение Streisand - если у Вас IOS. Hiddify,V2RayNG - Если у Вас Android .\n"
+            "2. Нажмите кнопку *Добавить ключ*.\n"
+            "3. Вставьте ваш ключ и нажмите *Подключить*.\n"
+            "4. Готово! Теперь вы защищены. 🛡️\n\n"
+            "⏳ *Срок действия тарифа:* 1 месяц\n\n"
+            "📜 Если возникнут вопросы, воспользуйтесь разделом *Помощь*."
+        )
+        await query.edit_message_text(
+            text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📜 Инструкция по подключению", callback_data='instruction')],
+                [InlineKeyboardButton("🤓 Помощь", callback_data='help')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='back')]
+            ])
+        )
+
+    elif choice == '250rub':
+        if user_data[user_id].get("balance", 0) < 250:
+            await query.answer("❌ Недостаточно средств на балансе. Пополните баланс через /pay.", show_alert=True)
+            return
+        
+        user_data[user_id]["balance"] -= 250
+        save_user_data(user_data)
+
+   
+        key_info = generate_key(user_id, duration_days=90) 
+        key = user_data[user_id].get("key", "Не найдено")
+
+        text = (
+            "🎉 *Вы успешно активировали тариф на 3 месяца!* 🎉\n\n"
+            f"🔑 *Ваш ключ:*\n`{key}`\`n\n"
+            "\n*Нажмите на ключ, чтобы его скопировать*\n\n"
+            "📝 *Что делать дальше?*\n"
+            "1. Скачайте приложение Streisand - если у Вас IOS. Hiddify,V2RayNG - Если у Вас Android .\n"
+            "2. Нажмите кнопку *Добавить ключ*.\n"
+            "3. Вставьте ваш ключ и нажмите *Подключить*.\n"
+            "4. Готово! Теперь вы защищены. 🛡️\n\n"
+            "⏳ *Срок действия тарифа:* 3 месяца\n\n"
+            "📜 Если возникнут вопросы, воспользуйтесь разделом *Помощь*."
+        )
+        
+        await query.edit_message_text(
+            text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📜 Инструкция по подключению", callback_data='instruction')],
+                [InlineKeyboardButton("🤓 Помощь", callback_data='help')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='back')]
+            ])
+        )
+
     elif choice == '500rub':
-        await query.edit_message_text('Вы выбрали тариф "500 рублей - 6 месяцев".')
+        if user_data[user_id].get("balance", 0) < 500:
+            await query.answer("❌ Недостаточно средств на балансе. Пополните баланс через /pay.", show_alert=True)
+            return
+        
+        user_data[user_id]["balance"] -= 500
+        save_user_data(user_data)
+
+        # Для тарифа на 6 месяцев срок действия - 180 дней
+        key_info = generate_key(user_id, duration_days=180)  # Передаем 180 дней для тарифа на 6 месяцев
+        key = user_data[user_id].get("key", "Не найдено")
+
+        text = (
+            "🎉 *Вы успешно активировали тариф на 6 месяцев!* 🎉\n\n"
+            f"🔑 *Ваш ключ:*\n`{key}`\n\n"
+            "\n*Нажмите на ключ, чтобы его скопировать*\n\n"
+            "📝 *Что делать дальше?*\n"
+            "1. Скачайте приложение Streisand - если у Вас IOS. Hiddify,V2RayNG - Если у Вас Android .\n"
+            "2. Нажмите кнопку *Добавить ключ*.\n"
+            "3. Вставьте ваш ключ и нажмите *Подключить*.\n"
+            "4. Готово! Теперь вы защищены. 🛡️\n\n"
+            "⏳ *Срок действия тарифа:* 6 месяцев\n\n"
+            "📜 Если возникнут вопросы, воспользуйтесь разделом *Помощь*."
+        )
+        
+        await query.edit_message_text(
+            text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📜 Инструкция по подключению", callback_data='instruction')],
+                [InlineKeyboardButton("🤓 Помощь", callback_data='help')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='back')]
+            ])
+        )
     
     elif choice == 'back':
         await query.answer()
-        await start(query, context)
+        await start(update, context)
 
-# Функция обработки кнопки "Помощь"
 async def handle_help(update, context):
     await update.callback_query.answer()
-    await update.callback_query.message.edit_text(
-        "Если вам необходима помощь с пополнением или настройкой VPN, обратитесь сюда: [@othrwise](https://t.me/othrwise)",
-        parse_mode="Markdown"
+    text = (
+        " *Помощь*\n\n"
+        "Если вам нужна помощь с пополнением или настройкой VPN, обратитесь к нашему специалисту:\n"
+        "[@othrwise](https://t.me/othrwise)\n\n"
+        "_Мы всегда рады помочь!_ 😊"
+    )
+    
+    await update.callback_query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Назад", callback_data="back")]
+        ])
     )
 
-# Функция обработки "Мой аккаунт"
 async def handle_account(update, context):
     user_id = str(update.callback_query.from_user.id)
 
-    # Проверяем, есть ли данные у пользователя
     if user_id not in user_data or "email" not in user_data[user_id]:
         await update.callback_query.answer("У вас еще нет активного аккаунта!", show_alert=True)
         return
 
-    # Получаем email и дату окончания
     user_email = user_data[user_id]["email"]
     expiry_time = user_data[user_id].get("expiryTime", "Не указано")
+    key_link = user_data[user_id].get("key", "Не найдено")
+    user_balance = user_data[user_id].get("balance", 0)
 
-    # Если дата в строковом формате, пытаемся конвертировать её в datetime
-    if isinstance(expiry_time, str):
-        try:
-            # Пробуем распарсить дату в формате "YYYY-MM-DD HH:MM"
-            expiry_datetime = datetime.strptime(expiry_time, "%Y-%m-%d %H:%M")
-            expiry_time = expiry_datetime.strftime("%d-%m-%Y %H:%M")
-        except ValueError:
-            expiry_time = "Неверный формат даты"
-
-    await update.callback_query.message.edit_text(
-        f"Ваш аккаунт:\n\n"
-        f"📧 Email: {user_email}\n"
-        f"⏳ Срок действия: {expiry_time}"
+    text = (
+        "👤 *Ваш аккаунт*\n\n"
+        f"📧 *Email:* `{user_email}`\n"
+        f"⏳ *Срок действия:* `{expiry_time}`\n"
+        f"🔑 *Ваш ключ:*\n `{key_link}` \n\n"
+        "*Нажмите на ключ, чтобы его скопировать*\n"
+        f"💰 *Баланс:* `{user_balance} рублей`\n\n"
+        "_Скопируйте ключ и используйте его в приложении._\n"
+        "Если возникнут вопросы, воспользуйтесь разделом *Помощь*."
+    )
+    
+    await update.callback_query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🤓 Помощь", callback_data='help')],
+            [InlineKeyboardButton("🔙 Назад", callback_data="back")]
+        ])
     )
 
-
-
-# Основная функция для запуска бота
 def main():
     TOKEN = '7618148235:AAFGTnPyYnPf82EPGoYocndpXMl12yRYpVw'
-    
-    application = Application.builder().token(TOKEN).build()
-    
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(handle_connect, pattern='^connect$'))
-    application.add_handler(CallbackQueryHandler(handle_tariff, pattern='^(trial|100rub|500rub|back)$'))
-    application.add_handler(CallbackQueryHandler(handle_help, pattern='^help$'))  
-    application.add_handler(CallbackQueryHandler(handle_instruction, pattern='^instruction$')) 
-    application.add_handler(CallbackQueryHandler(handle_account, pattern='^account$'))  # Добавляем обработчик для "Мой аккаунт"
 
-    login()  # Логинимся в API перед запуском
+    application = Application.builder().token(TOKEN).post_init(post_init).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("pay", pay))
+    application.add_handler(CommandHandler("balance", balance))
+    application.add_handler(CallbackQueryHandler(handle_connect, pattern='^connect$'))
+    application.add_handler(CallbackQueryHandler(handle_tariff, pattern='^(trial|100rub|250rub|500rub|back)$'))
+    application.add_handler(CallbackQueryHandler(handle_help, pattern='^help$'))
+    application.add_handler(CallbackQueryHandler(handle_instruction, pattern='^instruction$'))
+    application.add_handler(CallbackQueryHandler(handle_account, pattern='^account$'))
+
+    login()
+
+    # Запускаем бота
     application.run_polling()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
