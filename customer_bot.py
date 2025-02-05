@@ -5,8 +5,9 @@ import uuid
 import random
 import string
 from datetime import datetime, timedelta
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, MenuButtonCommands
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, MenuButtonCommands, Update
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext, MessageHandler, filters
+from yookassa import Configuration, Payment
 
 # Файл для хранения данных
 DATA_FILE = "users.json"
@@ -15,7 +16,27 @@ DATA_FILE = "users.json"
 API_URL = "http://109.120.184.34:57189"
 USERNAME = os.getenv("API_USERNAME")
 PASSWORD = os.getenv("API_PASSWORD")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 SESSION_KEY = None
+
+Configuration.account_id = '1027685'
+Configuration.secret_key = 'test_gSCcoBfzGAjni5SJA1vtH4RC9Y0nAVhpDakc6Itc1bY'
+
+
+# Глобальный словарь для хранения ожидающих платежей
+pending_payments = {}  # Формат: { payment_id: { "user_id": <id>, "amount": <сумма> } }
+
+def create_payment(user_id, amount):
+    payment = Payment.create({
+        "amount": {"value": str(amount), "currency": "RUB"},
+        "capture": True,
+        "confirmation": {"type": "redirect", "return_url": "https://твой-сайт.ру/success"},
+        "description": f"Пополнение баланса пользователя {user_id} на {amount} RUB"
+    })
+    # Сохраняем информацию о платеже для последующей проверки
+    pending_payments[payment.id] = {"user_id": str(user_id), "amount": amount}
+    return payment.confirmation.confirmation_url, payment.id
+
 
 # Функция загрузки данных
 def load_user_data():
@@ -117,6 +138,7 @@ def generate_key(user_id, duration_days):
     except Exception as e:
         return f"❌ Ошибка соединения с API: {e}"
 
+
 async def set_bot_commands(application):
     await application.bot.set_my_commands([
         BotCommand("start", "Запустить бота")
@@ -133,16 +155,72 @@ async def post_init(application: Application):
     await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
 
-async def pay(update, context):
-    text = (
-        "💳 *Пополнение баланса*\n\n"
-        "Чтобы пополнить баланс нужно сделать сальто и не смотреть под подушку:\n"
-        "👉 +7 (XXX) XXX-XX-XX\n\n"
-        "После оплаты отправьте скриншот чека сюда: [@othrwise](https://t.me/othrwise).\n"
-        "Мы зачислим средства на ваш баланс в течение 15 минут."
+async def pay(update: Update, context: CallbackContext):
+    await update.message.reply_text(
+        "⚠️ Автоматическая касса пока не настроена.\n"
+        "Для оплаты, пожалуйста, свяжитесь с:[@othrwise](https://t.me/othrwise)",
+        parse_mode="Markdown"
     )
+
+
+async def process_amount(update: Update, context: CallbackContext):
+    try:
+        amount = float(update.message.text)
+        if amount < 1:
+            raise ValueError("Сумма должна быть больше 1 рубля.")
+        
+        user_id = update.message.from_user.id
+        url, payment_id = create_payment(user_id, amount)
+        
+        # Можно сохранить payment_id для пользователя в user_data, если нужно отслеживать отдельно
+        if str(user_id) not in user_data:
+            user_data[str(user_id)] = {"balance": 0}
+        user_data[str(user_id)]["last_payment_id"] = payment_id
+        save_user_data(user_data)
+        
+        keyboard = [[InlineKeyboardButton("Оплатить", url=url)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text(f"Оплатите {amount} RUB по ссылке:", reply_markup=reply_markup)
+        await update.message.reply_text("После оплаты введите команду /check_payment для проверки статуса платежа.")
+    except ValueError:
+        await update.message.reply_text("Некорректная сумма. Введите число больше 1.")
+
+async def check_payment(update: Update, context: CallbackContext):
+    user_id = str(update.message.from_user.id)
+    # Проверяем, есть ли у пользователя ожидающий платёж
+    user_payment_id = user_data.get(user_id, {}).get("last_payment_id")
     
-    await update.message.reply_text(text, parse_mode="Markdown")
+    if not user_payment_id:
+        await update.message.reply_text("Нет ожидающих платежей. Начните процесс оплаты командой /pay.")
+        return
+
+    # Получаем данные о платеже
+    try:
+        payment = Payment.find_one(user_payment_id)
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка при проверке платежа: {e}")
+        return
+
+    if payment.status == "succeeded":
+        # Пополняем баланс
+        payment_info = pending_payments.get(user_payment_id)
+        if payment_info:
+            amount = payment_info["amount"]
+            # Обновляем баланс пользователя в файле
+            user_data[user_id]["balance"] = user_data[user_id].get("balance", 0) + amount
+            save_user_data(user_data)
+            # Удаляем запись об обработанном платеже
+            del pending_payments[user_payment_id]
+            # Можно удалить last_payment_id, чтобы избежать повторной проверки
+            del user_data[user_id]["last_payment_id"]
+            save_user_data(user_data)
+            await update.message.reply_text(f"Платёж успешно подтверждён! Ваш баланс пополнен на {amount} RUB.")
+        else:
+            await update.message.reply_text("Платёж не найден в ожидающих. Возможно, он уже обработан.")
+    else:
+        await update.message.reply_text("Платёж ещё не подтверждён. Попробуйте позже.")
+
 
 async def balance(update, context):
     user_id = str(update.message.from_user.id)
@@ -420,18 +498,21 @@ async def handle_account(update, context):
     )
 
 def main():
-    TOKEN = '7618148235:AAFGTnPyYnPf82EPGoYocndpXMl12yRYpVw'
 
-    application = Application.builder().token(TOKEN).post_init(post_init).build()
+    application = Application.builder().token('7618148235:AAFGTnPyYnPf82EPGoYocndpXMl12yRYpVw').post_init(post_init).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("pay", pay))
     application.add_handler(CommandHandler("balance", balance))
+    application.add_handler(CommandHandler("check_payment", check_payment))
     application.add_handler(CallbackQueryHandler(handle_connect, pattern='^connect$'))
     application.add_handler(CallbackQueryHandler(handle_tariff, pattern='^(trial|100rub|250rub|500rub|back)$'))
     application.add_handler(CallbackQueryHandler(handle_help, pattern='^help$'))
     application.add_handler(CallbackQueryHandler(handle_instruction, pattern='^instruction$'))
     application.add_handler(CallbackQueryHandler(handle_account, pattern='^account$'))
+    
+    # Добавляем обработчик для текстовых сообщений (без команд)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_amount))
 
     login()
 
