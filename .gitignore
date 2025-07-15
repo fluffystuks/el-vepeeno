@@ -1,0 +1,25 @@
+# Игнорируем кэш Python
+__pycache__/
+*.pyc
+
+# Игнорируем виртуальное окружение, если используешь
+venv/
+env/
+
+# Игнорируем базу данных SQLite
+*.db
+vpn_bot.db
+
+# Игнорируем твои конфиги с секретами
+config.py
+.env
+
+# Логи, если ведёшь
+*.log
+
+# PyCharm / VSCode
+.idea/
+.vscode/
+
+# System files
+.DS_Store
