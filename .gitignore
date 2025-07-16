@@ -1,3 +1,8 @@
+**/.env
+*.json
+venv/
+pisun.py
+
 # Игнорируем кэш Python
 __pycache__/
 *.pyc
@@ -11,7 +16,6 @@ env/
 vpn_bot.db
 
 # Игнорируем твои конфиги с секретами
-config.py
 .env
 
 # Логи, если ведёшь
