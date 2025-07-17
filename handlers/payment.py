@@ -9,9 +9,6 @@ from services.payment_service import create_payment, check_payment
 
 PAYMENT_AMOUNT = 1
 
-# ================================================
-# /pay — ждёт сумму + ставит автоотмену через JobQueue
-# ================================================
 async def pay_handler(update: Update, context: CallbackContext) -> int:
     if update.message:
         user_id, _ = get_or_create_user(str(update.message.from_user.id))
@@ -41,37 +38,29 @@ async def pay_handler(update: Update, context: CallbackContext) -> int:
     else:
         await update.callback_query.message.reply_text("Введите сумму пополнения (мин. 50 RUB):")
 
-    # 🟢 Ставим задачу автоотмены — даём имя, чтобы потом снять
     context.job_queue.run_once(
-        cancel_waiting_amount,
+        cancel_payment_conversation,
         120,
         chat_id=chat_id,
-        name=f"cancel_{chat_id}"
+        name=f"cancel_conv_{chat_id}"
     )
 
     return PAYMENT_AMOUNT
 
-# ================================================
-# Таймер автоотмены
-# ================================================
-async def cancel_waiting_amount(context: CallbackContext):
-    context.chat_data["expired"] = True  # ставим флаг
+
+async def cancel_payment_conversation(context: CallbackContext):
+    chat_id = context.job.chat_id
+    user_id, _ = get_or_create_user(str(chat_id))
+    cancel_pending_payment(user_id)
+
     await context.bot.send_message(
-        context.job.chat_id,
-        "⏰ Время на ввод суммы истекло. Попробуйте снова через /pay. Если же /pay не работает, попробуйте ввести любое число, возможно, бот ожидает число."
+        chat_id=chat_id,
+        text="❌ Время ожидания ввода суммы истекло. Платёж отменён. Начните заново через /pay."
     )
 
 
-# ================================================
-# Обработка введённой суммы + отключение таймера
-# ================================================
+
 async def process_payment_amount(update: Update, context: CallbackContext) -> int:
-    if context.chat_data.get("expired"):
-        await update.message.reply_text(
-            "⏰ Время на ввод суммы истекло. Попробуйте снова через /pay. Если же /pay не работает, попробуйте ввести любое число, возможно, бот ожидает число."
-        )
-        return ConversationHandler.END
-    
     try:
         amount = float(update.message.text)
         if amount < 50:
@@ -87,9 +76,8 @@ async def process_payment_amount(update: Update, context: CallbackContext) -> in
 
         save_payment(user_id, payment_id, amount)
 
-        # 🟢 Снимаем задачу таймера, если пользователь всё ввёл вовремя
         for job in context.job_queue.jobs():
-            if job.name == f"cancel_{update.effective_chat.id}":
+            if job.name == f"cancel_conv_{update.effective_chat.id}":
                 job.schedule_removal()
 
         keyboard = [
@@ -99,10 +87,11 @@ async def process_payment_amount(update: Update, context: CallbackContext) -> in
         markup = InlineKeyboardMarkup(keyboard)
 
         await update.message.reply_text(
-            f"Перейдите по ссылке для оплаты {amount} RUB:\n\n"
-            "После оплаты обязательно нажмите кнопку ✅ Проверить платёж "
-            "или введите команду /check_payment — чтобы бот подтвердил и пополнил ваш баланс!"
-        ,
+            f"💳 *Оплата {amount} RUB*\n\n"
+            f"Перейдите по ссылке для оплаты, а затем подтвердите платёж:\n\n"
+            f"✅ Нажмите кнопку *«Проверить платёж»* или введите команду /check_payment\n\n"
+            f"_💡 Только после подтверждения баланс будет зачислен._",
+            parse_mode="Markdown",
             reply_markup=markup
         )
         return ConversationHandler.END
@@ -111,9 +100,7 @@ async def process_payment_amount(update: Update, context: CallbackContext) -> in
         await update.message.reply_text("Введите корректную сумму.")
         return PAYMENT_AMOUNT
 
-# ================================================
-# Проверка оплаты вручную
-# ================================================
+
 async def check_payment_handler(update: Update, context: CallbackContext):
     if update.callback_query:
         user_id, balance = get_or_create_user(str(update.callback_query.from_user.id))
@@ -167,9 +154,7 @@ async def check_payment_handler(update: Update, context: CallbackContext):
             parse_mode="Markdown"
         )
 
-# ================================================
-# Отмена платежа вручную
-# ================================================
+
 async def cancel_payment_handler(update: Update, context: CallbackContext):
     if update.callback_query:
         user_id, _ = get_or_create_user(str(update.callback_query.from_user.id))

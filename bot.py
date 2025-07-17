@@ -38,7 +38,8 @@ payment_conv_handler = ConversationHandler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, process_payment_amount)
         ]
     },
-    fallbacks=[]
+    fallbacks=[],
+    allow_reentry=True
 )
 
 async def post_init(application):
