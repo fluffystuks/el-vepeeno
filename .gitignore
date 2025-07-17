@@ -6,14 +6,14 @@ pisun.py
 # Игнорируем кэш Python
 __pycache__/
 *.pyc
-
+json-db.py
 # Игнорируем виртуальное окружение, если используешь
 venv/
 env/
 
 # Игнорируем базу данных SQLite
 *.db
-vpn_bot.db
+misc_funcs
 
 # Игнорируем твои конфиги с секретами
 .env
