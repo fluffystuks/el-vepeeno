@@ -9,7 +9,8 @@ async def start_scheduler(application: Application):
     # Проверка ключей раз в сутки, в 00:00 по Москве
     application.job_queue.run_daily(
         callback=check_keys_once,
-        time=datetime.time(hour=0, minute=0, tzinfo=pytz.timezone("Europe/Moscow"))
+        time=datetime.time(hour=0, minute=0, tzinfo=pytz.timezone("Europe/Moscow")),
+        days=(0, 1, 2, 3, 4, 5, 6)
     )
 
     application.job_queue.run_repeating(
