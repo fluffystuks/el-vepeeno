@@ -61,9 +61,11 @@ async def tariff_handler(update: Update, context: CallbackContext):
                 result['email'],
                 result['link'],
                 result['expiry_time'],
-                result['client_id']  # ✅ теперь передаёшь client_id
+                result['client_id']
             )
             mark_trial_used(user_id)
+
+            expiry_date = datetime.datetime.fromtimestamp(result['expiry_time'] // 1000).strftime('%d.%m.%Y')  # ✅ добавлено
 
             await query.edit_message_text(
                 f"🎉 *Пробный ключ активирован!*\n\n"

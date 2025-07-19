@@ -1,11 +1,9 @@
-from db import get_key_by_id, update_key_expiry, activate_key, get_or_create_user, update_balance
-from services.extend_service import extend_key  
-
+from db import get_key_by_id, update_key_expiry, activate_key, get_or_create_user, update_balance,reset_notified_level
 
 
 async def extend_key_handler(update, context):
     query = update.callback_query
-    data = query.data  # пример: extend_1_30
+    data = query.data 
     print("🔍 query.data:", data)
 
     parts = data.split("_")
@@ -42,6 +40,13 @@ async def extend_key_handler(update, context):
         update_key_expiry(key_id, result)
         activate_key(key_id)
         update_balance(user_id, balance - price)
-        await query.answer(f"✅ Ключ продлён на {add_days} дней!\n💰 Списано {price} RUB.", show_alert=True)
+        reset_notified_level(key_id)     
+        await query.answer(
+            f"✅ Готово!\n\n"
+            f"🔐 Ключ продлён на {add_days} дней\n"
+            f"💰 Списано: {price} RUB\n\n"
+            "Спасибо, что остаетесь с нами! ❤️",
+            show_alert=True
+        )
     else:
         await query.answer("❌ Ошибка при продлении!", show_alert=True)

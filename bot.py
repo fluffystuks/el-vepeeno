@@ -1,3 +1,11 @@
+import warnings
+from telegram.warnings import PTBUserWarning
+
+warnings.filterwarnings(
+    action="ignore",
+    message=r".*CallbackQueryHandler.*",
+    category=PTBUserWarning
+)
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -6,7 +14,6 @@ from telegram.ext import (
     ConversationHandler,
     filters
 )
-import datetime
 from config import TELEGRAM_TOKEN
 from db import init_db
 from handlers.start import start
@@ -14,15 +21,16 @@ from handlers.payment import (
     pay_handler,
     process_payment_amount,
     check_payment_handler,
-    cancel_payment_handler
+    cancel_payment_handler,
+    cancel_handler,
+    timeout_handler
 )
 from handlers.keys import connect_handler, tariff_handler
 from handlers.account import account_handler, show_key_handler
 from handlers.extend import extend_key_handler
 from handlers.misc import help_handler, instruction_handler, rules_handler
-from scheduler import start_scheduler
 from services.key_service import login
-from utils import refresh_session_key_once
+from scheduler import start_scheduler
 
 from telegram import BotCommand, MenuButtonCommands
 
@@ -36,32 +44,29 @@ payment_conv_handler = ConversationHandler(
     states={
         PAYMENT_AMOUNT: [
             MessageHandler(filters.TEXT & ~filters.COMMAND, process_payment_amount)
-        ]
+        ],
+        ConversationHandler.TIMEOUT: [
+            MessageHandler(filters.ALL, timeout_handler)
+        ],
     },
-    fallbacks=[],
-    allow_reentry=True
+    fallbacks=[
+        CommandHandler("cancel", cancel_handler)
+    ],
+    allow_reentry=True,
+    conversation_timeout=60  
 )
 
+
 async def post_init(application):
-    
-    application.job_queue.run_daily(
-        start_scheduler,
-        time=datetime.time(hour=0, minute=0)
-    )
+    await start_scheduler(application)
 
-    
-    application.job_queue.run_repeating(
-        refresh_session_key_once,
-        interval=12*60*60
-    )
-
-    
     await application.bot.set_my_commands([
         BotCommand("start", "Запустить бота"),
         BotCommand("pay", "Пополнить баланс"),
         BotCommand("check_payment", "Проверить платёж")
     ])
     await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+
 
 def main():
     init_db()

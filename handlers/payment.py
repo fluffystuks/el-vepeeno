@@ -1,4 +1,4 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import CallbackContext, ConversationHandler
 from db import (
     get_or_create_user, has_pending_payment, cancel_pending_payment,
@@ -17,10 +17,6 @@ async def pay_handler(update: Update, context: CallbackContext) -> int:
     user_id, _ = get_or_create_user(tg_id)
     chat_id = update.effective_chat.id
 
-    # 🧹 Сброс флагов и таймера
-    for job in context.job_queue.get_jobs_by_name(f"cancel_{chat_id}"):
-        job.schedule_removal()
-    context.chat_data["expired"] = False
 
     if has_pending_payment(user_id):
         markup = InlineKeyboardMarkup([
@@ -41,39 +37,18 @@ async def pay_handler(update: Update, context: CallbackContext) -> int:
             )
         return ConversationHandler.END
 
-    # 🔔 Спрашиваем сумму
     if update.message:
         await update.message.reply_text("Введите сумму пополнения (мин. 50 RUB):")
     else:
         await update.callback_query.message.reply_text("Введите сумму пополнения (мин. 50 RUB):")
 
-    # ⏳ Ставим таймер автоотмены
-    context.job_queue.run_once(
-        cancel_waiting_amount,
-        60,
-        chat_id=chat_id,
-        name=f"cancel_{chat_id}"
-    )
+    return PAYMENT_AMOUNT 
 
-    return PAYMENT_AMOUNT
-
-# ================================================
-# Таймер автоотмены
-# ================================================
-async def cancel_waiting_amount(context: CallbackContext):
-    context.chat_data["expired"] = True
-    await context.bot.send_message(
-        context.job.chat_id,
-        "⏰ Время на ввод суммы истекло. Попробуйте снова через /pay."
-    )
 
 # ================================================
 # Ввод суммы
 # ================================================
 async def process_payment_amount(update: Update, context: CallbackContext) -> int:
-    if context.chat_data.get("expired"):
-        return ConversationHandler.END
-
     try:
         amount = float(update.message.text)
         if amount < 50:
@@ -90,9 +65,6 @@ async def process_payment_amount(update: Update, context: CallbackContext) -> in
 
         save_payment(user_id, payment_id, amount)
 
-        # 🧹 Убиваем таймер, если успели вовремя
-        for job in context.job_queue.get_jobs_by_name(f"cancel_{update.effective_chat.id}"):
-            job.schedule_removal()
 
         markup = InlineKeyboardMarkup([
             [InlineKeyboardButton("💰 Оплатить", url=url)],
@@ -111,6 +83,21 @@ async def process_payment_amount(update: Update, context: CallbackContext) -> in
     except ValueError:
         await update.message.reply_text("Введите корректную сумму.")
         return PAYMENT_AMOUNT
+
+async def timeout_handler(update, context):
+    await update.message.reply_text(
+        "⌛️ *Время ожидания истекло.*\n\nПопробуйте снова через /pay, когда будете готовы.",
+        parse_mode="Markdown",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return ConversationHandler.END
+
+async def cancel_handler(update, context):
+    await update.message.reply_text(
+        "❌ Оплата отменена. Используйте /pay, когда будете готовы.",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return ConversationHandler.END
 
 # ================================================
 # Проверка оплаты вручную
@@ -136,11 +123,13 @@ async def check_payment_handler(update: Update, context: CallbackContext):
         update_balance(user_id, new_balance)
 
         await target.reply_text(
-            f"✅ <b>Платёж подтверждён!</b>\n\n"
-            f"💰 Баланс пополнен на <b>{amount} RUB</b>\n"
-            f"💰 Новый баланс: <b>{new_balance} RUB</b>",
+            f"✅ <b>Платёж успешно прошёл!</b>\n\n"
+            f"💰 Пополнено: <b>{amount} RUB</b>\n"
+            f"💳 Новый баланс: <b>{new_balance} RUB</b>\n\n"
+            f"Спасибо за поддержку сервиса! ❤️",
             parse_mode="HTML"
         )
+
 
     elif status == "pending":
         markup = InlineKeyboardMarkup([

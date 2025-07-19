@@ -11,7 +11,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tg_id TEXT UNIQUE,
                 balance REAL DEFAULT 0,
-                trial_used INTEGER DEFAULT 0  -- 🟢 Новое поле!
+                trial_used INTEGER DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS keys (
@@ -23,6 +23,7 @@ def init_db():
                 created_at INTEGER,
                 active INTEGER DEFAULT 1,
                 client_id TEXT,
+                notified_level INTEGER DEFAULT 0,  -- 🟢 Добавлено
                 FOREIGN KEY(user_id) REFERENCES users(id)
             );
 
@@ -38,6 +39,7 @@ def init_db():
         """)
         conn.commit()
 
+
 def get_key_by_id(key_id: int):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
@@ -47,12 +49,25 @@ def get_key_by_id(key_id: int):
         """, (key_id,))
         return cursor.fetchone()
 
+def update_notified_level(key_id: int, level: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE keys SET notified_level = ? WHERE id = ?", (level, key_id))
+        conn.commit()
+
+
 def update_key_expiry(key_id: int, new_expiry: int):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE keys SET expiry_time = ? WHERE id = ?
         """, (new_expiry, key_id))
+        conn.commit()
+
+def reset_notified_level(key_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE keys SET notified_level = 0 WHERE id = ?", (key_id,))
         conn.commit()
 
 def activate_key(key_id: int):
@@ -109,6 +124,12 @@ def get_or_create_user(tg_id: str):
             cursor.execute("INSERT INTO users (tg_id) VALUES (?)", (tg_id,))
             conn.commit()
             return cursor.lastrowid, 0
+
+def mark_notified(key_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE keys SET notified = 1 WHERE id = ?", (key_id,))
+        conn.commit()
 
 def update_balance(user_id: int, new_balance: float):
     with sqlite3.connect(DB_NAME) as conn:
@@ -174,20 +195,26 @@ def update_payment_status(payment_id: str, status: str):
         """, (status, payment_id))
         conn.commit()
 
-def get_expiring_keys():
-    """ Вернёт список ключей с инфой: сколько осталось """
+def reset_notification_flag(key_id: int):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
-        now = int(time.time() * 1000)  # в миллисекундах
+        cursor.execute("UPDATE keys SET notified = 0 WHERE id = ?", (key_id,))
+        conn.commit()
+
+
+def get_expiring_keys():
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        now = int(time.time() * 1000)
         cursor.execute("""
-            SELECT keys.id, keys.user_id, keys.email, keys.expiry_time, users.tg_id
+            SELECT keys.id, keys.user_id, keys.email, keys.expiry_time, users.tg_id, keys.notified_level
             FROM keys
             JOIN users ON keys.user_id = users.id
             WHERE keys.active = 1
         """)
         keys = []
         for row in cursor.fetchall():
-            key_id, user_id, email, expiry_ms, tg_id = row
+            key_id, user_id, email, expiry_ms, tg_id, notified_level = row
             remaining = (expiry_ms // 1000) - int(time.time())
             keys.append({
                 "key_id": key_id,
@@ -195,10 +222,11 @@ def get_expiring_keys():
                 "tg_id": tg_id,
                 "email": email,
                 "expiry_time": expiry_ms,
-                "remaining_seconds": remaining
+                "remaining_seconds": remaining,
+                "notified_level": notified_level
             })
         return keys
-
+    
 def deactivate_key(key_id):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
