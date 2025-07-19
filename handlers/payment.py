@@ -50,7 +50,7 @@ async def pay_handler(update: Update, context: CallbackContext) -> int:
     # ⏳ Ставим таймер автоотмены
     context.job_queue.run_once(
         cancel_waiting_amount,
-        10,
+        60,
         chat_id=chat_id,
         name=f"cancel_{chat_id}"
     )
