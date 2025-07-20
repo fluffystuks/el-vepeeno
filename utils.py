@@ -1,7 +1,8 @@
 import asyncio
 from services.key_service import login
+from telegram.ext import CallbackContext
 
-async def refresh_session_key_once():
+async def refresh_session_key_once(context: CallbackContext) -> None:
     print("🔑 Пробуем обновить SESSION_KEY...")
     success = login()
     if success:

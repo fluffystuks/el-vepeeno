@@ -7,6 +7,7 @@ import datetime
 
 async def connect_handler(update: Update, context: CallbackContext):
     query = update.callback_query
+    await query.answer()
     tg_id = str(query.from_user.id)
     user_id, _ = get_or_create_user(tg_id)
 
@@ -37,6 +38,7 @@ async def connect_handler(update: Update, context: CallbackContext):
 
 async def tariff_handler(update: Update, context: CallbackContext):
     query = update.callback_query
+    await query.answer()
     choice = query.data
     tg_id = str(query.from_user.id)
     user_id, balance = get_or_create_user(tg_id)
@@ -72,7 +74,7 @@ async def tariff_handler(update: Update, context: CallbackContext):
                 f"📧 *Email:* `{result['email']}`\n"
                 f"🔑 *Ключ:*\n`{result['link']}`\n\n"
                 f"⏳ *Действует до:* *{expiry_date}*\n\n"
-                "🆓 Пробный ключ можно использовать один раз.\n"
+                "⚠️ *Ограничение:* до *2 устройств одновременно*.\n\n"
                 "📜 При необходимости откройте раздел *Инструкция*.",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup(
@@ -112,9 +114,10 @@ async def tariff_handler(update: Update, context: CallbackContext):
                 f"🔑 *Ваш ключ:*\n`{result['link']}`\n\n"
                 f"⏳ *Срок действия до:* *{expiry_date}*\n"
                 f"💰 *Новый баланс:* *{new_balance} RUB*\n\n"
-                f"✅ Скопируйте ключ и вставьте его в приложение VPN.\n"
-                f"📜 При необходимости откройте раздел *Инструкция*.\n\n"
-                f"Спасибо, что вы с нами! ❤️",
+                "⚠️ *Ограничение:* до *2 устройств одновременно*.\n\n"
+                "✅ Скопируйте ключ и вставьте его в приложение VPN.\n"
+                "📜 При необходимости откройте раздел *Инструкция*.\n\n"
+                "Спасибо, что вы с нами! ❤️",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup(
                     [[InlineKeyboardButton("🔙 В меню", callback_data="back")]]

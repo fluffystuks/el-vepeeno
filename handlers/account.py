@@ -8,6 +8,7 @@ import datetime,time
 # ===============================================
 async def account_handler(update: Update, context: CallbackContext):
     query = update.callback_query
+    await query.answer()
     tg_id = str(query.from_user.id)
     user_id, balance = get_or_create_user(tg_id)
 
@@ -45,6 +46,7 @@ async def account_handler(update: Update, context: CallbackContext):
 # ===============================================
 async def show_key_handler(update: Update, context: CallbackContext):
     query = update.callback_query
+    await query.answer()
     callback_data = query.data  # key_123
     key_id = int(callback_data.split("_")[1])
 

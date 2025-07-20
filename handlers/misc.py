@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 
 async def instruction_handler(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
     keyboard = [[InlineKeyboardButton("🔙 Вернуться в меню", callback_data='back')]]
     markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
@@ -13,6 +14,7 @@ async def instruction_handler(update: Update, context: CallbackContext):
     )
 
 async def rules_handler(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
     text = (
         "📌 *Правила использования Pien VPN* 📌\n\n"
         "1️⃣ Конфиденциальность — наша главная ценность. Мы не собираем журналы подключений, не сохраняем историю посещений и не передаём ваши личные данные кому-либо ещё. Всё, что вы делаете через наш VPN, остаётся только между вами и защищённым соединением.\n\n"
@@ -31,6 +33,7 @@ async def rules_handler(update: Update, context: CallbackContext):
         await update.callback_query.edit_message_text(text, parse_mode="Markdown", reply_markup=markup)
 
 async def help_handler(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
     keyboard = [[InlineKeyboardButton("🔙 Вернуться в меню", callback_data='back')]]
     markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
