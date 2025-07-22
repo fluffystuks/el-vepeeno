@@ -2,7 +2,7 @@
 *.json
 venv/
 pisun.py
-
+.venv/
 # Игнорируем кэш Python
 __pycache__/
 *.pyc
