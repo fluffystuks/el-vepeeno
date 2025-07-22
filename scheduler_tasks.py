@@ -59,8 +59,8 @@ async def handle_key_notification(bot, key):
         if (days_left == day or (day == 0 and days_left <= 0)) and notified_level < level:
             if day == 0:
                 deactivate_key(key_id)
-
-            await bot.send_message(chat_id=tg_id, text=message := text.format(email=email), parse_mode="Markdown")
+            message = text.format(email=email)
+            await bot.send_message(chat_id=tg_id, text=message, parse_mode="Markdown")
             update_notified_level(key_id, level)
             log_message = f"[📨] TG ID {tg_id} — {message}"
             if ADMIN_TG_ID:
