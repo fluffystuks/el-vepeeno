@@ -1,4 +1,5 @@
 # scheduler_tasks.py
+from config import ADMIN_TG_ID
 import math
 from datetime import datetime
 from db import get_expiring_keys, deactivate_key, update_notified_level
@@ -64,5 +65,10 @@ async def handle_key_notification(bot, key):
                 parse_mode="Markdown"
             )
             update_notified_level(key_id, level)
-            print(f"[📨] TG ID {tg_id} — {text.format(email=email)}")
+            log_message = f"[📨] TG ID {tg_id} — {message}"
+            if ADMIN_TG_ID:
+                try:
+                    await bot.send_message(chat_id=ADMIN_TG_ID, text=log_message)
+                except Exception as e:
+                    print(f"❌ Не удалось отправить админу: {e}")
             break
