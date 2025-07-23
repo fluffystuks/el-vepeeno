@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 from db import (
     get_or_create_user,
@@ -121,4 +121,40 @@ async def apply_bonus(update: Update, context: CallbackContext):
         await update.message.reply_text(f"✅ Бонус применён, ключ продлён на {bonus[2]} дней")
     else:
         await update.message.reply_text("❌ Ошибка при продлении")
+
+
+async def referral_menu(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    tg_id = str(query.from_user.id)
+    link = generate_referral_link(context.bot.username, tg_id)
+
+    keyboard = [
+        [InlineKeyboardButton("🎁 Мои бонусы", callback_data="show_bonuses")],
+        [InlineKeyboardButton("🔙 В меню", callback_data="back")],
+    ]
+
+    text = (
+        "🤝 *Реферальная программа*\n\n"
+        "Приглашайте друзей и получайте бонусы за регистрацию и оплату.\n\n"
+        f"🔗 *Ваша ссылка:*\n`{link}`"
+    )
+
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+
+async def show_bonuses(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    tg_id = str(query.from_user.id)
+    user_id, _ = get_or_create_user(tg_id)
+    bonuses = get_user_active_bonuses(user_id)
+    if not bonuses:
+        text = "У вас нет активных бонусов."
+    else:
+        text = "Ваши бонусы:\n" + "\n".join(format_bonus(b) for b in bonuses)
+        text += "\nИспользуйте /apply_bonus <bonus_id> <key_id>"
+
+    keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="referral")]]
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 

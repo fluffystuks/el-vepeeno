@@ -28,7 +28,8 @@ async def start(update: Update, context: CallbackContext):
             [
                 InlineKeyboardButton("📜 Инструкция", callback_data="instruction"),
                 InlineKeyboardButton("💬 Поддержка", callback_data="help")
-            ]
+            ],
+            [InlineKeyboardButton("🎁 Реферальная программа", callback_data="referral")]
         ]
 
     else:
@@ -51,7 +52,8 @@ async def start(update: Update, context: CallbackContext):
             [
                 InlineKeyboardButton("🤓 Помощь", callback_data='help'),
                 InlineKeyboardButton("📌 Правила использования", callback_data="rules")
-            ]
+            ],
+            [InlineKeyboardButton("🎁 Реферальная программа", callback_data="referral")]
         ]
 
     markup = InlineKeyboardMarkup(keyboard)

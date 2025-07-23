@@ -29,7 +29,7 @@ from handlers.keys import connect_handler, tariff_handler
 from handlers.account import account_handler, show_key_handler
 from handlers.extend import extend_key_handler
 from handlers.misc import help_handler, instruction_handler, rules_handler
-from handlers.referral import list_bonuses, apply_bonus
+from handlers.referral import list_bonuses, apply_bonus, referral_menu, show_bonuses
 from services.key_service import login
 from scheduler import start_scheduler
 
@@ -97,6 +97,8 @@ def main():
     application.add_handler(CallbackQueryHandler(cancel_payment_handler, pattern="^cancel_payment$"))
     application.add_handler(CallbackQueryHandler(connect_handler, pattern="^connect$"))
     application.add_handler(CallbackQueryHandler(tariff_handler, pattern="^(trial|100rub|250rub|500rub|back)$"))
+    application.add_handler(CallbackQueryHandler(referral_menu, pattern="^referral$"))
+    application.add_handler(CallbackQueryHandler(show_bonuses, pattern="^show_bonuses$"))
     application.add_handler(CallbackQueryHandler(help_handler, pattern="^help$"))
     application.add_handler(CallbackQueryHandler(instruction_handler, pattern="^instruction$"))
 
