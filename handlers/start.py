@@ -1,10 +1,14 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 from db import get_or_create_user, is_trial_used
+from handlers.referral import process_signup
 
 async def start(update: Update, context: CallbackContext):
     tg_id = str(update.effective_user.id)
     user_id, _ = get_or_create_user(tg_id)
+    if update.message and context.args:
+        ref_tg = context.args[0]
+        await process_signup(update, context, ref_tg, user_id)
     trial = is_trial_used(user_id)
 
     if not trial:
@@ -24,7 +28,8 @@ async def start(update: Update, context: CallbackContext):
             [
                 InlineKeyboardButton("📜 Инструкция", callback_data="instruction"),
                 InlineKeyboardButton("💬 Поддержка", callback_data="help")
-            ]
+            ],
+            [InlineKeyboardButton("🎁 Реферальная программа", callback_data="referral")]
         ]
 
     else:
@@ -47,7 +52,8 @@ async def start(update: Update, context: CallbackContext):
             [
                 InlineKeyboardButton("🤓 Помощь", callback_data='help'),
                 InlineKeyboardButton("📌 Правила использования", callback_data="rules")
-            ]
+            ],
+            [InlineKeyboardButton("🎁 Реферальная программа", callback_data="referral")]
         ]
 
     markup = InlineKeyboardMarkup(keyboard)
