@@ -14,13 +14,7 @@ from db import (
 
 async def check_keys_once(context):
     bot = context.bot
-    start_msg = f"[{datetime.now().strftime('%H:%M:%S')}] 🔄 Проверка ключей"
-    print(start_msg)
-    if ADMIN_TG_ID:
-        try:
-            await bot.send_message(chat_id=ADMIN_TG_ID, text=start_msg)
-        except Exception as e:
-            print(f"❌ Не удалось отправить админу: {e}")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 🔄 Проверка ключей")
 
     keys = get_expiring_keys()
     for key in keys:
@@ -76,12 +70,6 @@ async def handle_key_notification(bot, key):
             message = text.format(email=email)
             await bot.send_message(chat_id=tg_id, text=message, parse_mode="Markdown")
             update_notified_level(key_id, level)
-            log_message = f"[📨] TG ID {tg_id} — {message}"
-            if ADMIN_TG_ID:
-                try:
-                    await bot.send_message(chat_id=ADMIN_TG_ID, text=log_message)
-                except Exception as e:
-                    print(f"❌ Не удалось отправить админу: {e}")
             break
 
 
@@ -102,8 +90,6 @@ async def check_bonuses_once(context):
             )
             try:
                 await bot.send_message(chat_id=bonus["tg_id"], text=message)
-                if ADMIN_TG_ID:
-                    await bot.send_message(chat_id=ADMIN_TG_ID, text=f"[Бонус] TG ID {bonus['tg_id']} — {message}")
             except Exception:
                 pass
 
@@ -118,7 +104,7 @@ async def backup_db_once(context):
         except Exception as e:
             print(f"❌ Не удалось отправить админу: {e}")
 
-    base_dir = Path(__file__).parent
+    base_dir = Path.home() / "el-vepeeno"
     db_path = base_dir / "vpn_bot.db"
     backups_dir = base_dir / "backups"
     backups_dir.mkdir(exist_ok=True)

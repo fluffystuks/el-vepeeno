@@ -1,11 +1,5 @@
 from yookassa import Configuration, Payment
-from config import (
-    YOOKASSA_ACCOUNT_ID,
-    YOOKASSA_SECRET_KEY,
-    ADMIN_TG_ID,
-    TELEGRAM_TOKEN,
-)
-from telegram import Bot
+from config import YOOKASSA_ACCOUNT_ID, YOOKASSA_SECRET_KEY
 from db import get_or_create_user
 
 Configuration.account_id = YOOKASSA_ACCOUNT_ID
@@ -50,13 +44,7 @@ def create_payment(tg_id, amount, user_email=None):
         return payment.confirmation.confirmation_url, payment.id
 
     except Exception as e:
-        error_msg = f"Ошибка при создании платежа: {e}"
-        print(error_msg)
-        if ADMIN_TG_ID:
-            try:
-                Bot(token=TELEGRAM_TOKEN).send_message(chat_id=ADMIN_TG_ID, text=error_msg)
-            except Exception:
-                pass
+        print(f"Ошибка при создании платежа: {e}")
         return None, None
 
 def check_payment(payment_id):
@@ -64,11 +52,5 @@ def check_payment(payment_id):
         payment = Payment.find_one(payment_id)
         return payment.status
     except Exception as e:
-        error_msg = f"Ошибка при проверке платежа: {e}"
-        print(error_msg)
-        if ADMIN_TG_ID:
-            try:
-                Bot(token=TELEGRAM_TOKEN).send_message(chat_id=ADMIN_TG_ID, text=error_msg)
-            except Exception:
-                pass
+        print(f"Ошибка при проверке платежа: {e}")
         return None
