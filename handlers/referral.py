@@ -17,6 +17,7 @@ from db import (
     reset_notified_level,
     get_key_owner,
     has_bonus,
+    get_user_tg,
 )
 from services.extend_service import extend_key
 
@@ -27,14 +28,33 @@ PAYMENT_BONUS_TIERS = {250: 15, 100: 7}
 MILESTONE_BONUSES = {3: 10, 5: 15}
 
 REASON_TEXTS = {
-    "signup_owner": "за приглашение друга",
-    "signup_user": "за регистрацию по ссылке",
-    "purchase_referrer": "за покупку вашим рефералом",
-    "payment_100": "за оплату от 100₽",
-    "payment_250": "за оплату от 250₽",
-    "milestone_3": "за 3 платящих реферала",
-    "milestone_5": "за 5 платящих рефералов",
+    "signup_owner": "🎉 за приглашение друга",
+    "signup_user": "🎁 за регистрацию по ссылке",
+    "purchase_referrer": "💸 за покупку вашим рефералом",
+    "payment_100": "👏 за оплату от 100₽",
+    "payment_250": "🔥 за оплату от 250₽",
+    "milestone_3": "🏅 за 3 платящих реферала",
+    "milestone_5": "🥇 за 5 платящих рефералов",
 }
+
+BONUS_MESSAGES = {
+    "signup_owner": "🥳 Ваш друг зарегистрировался по вашей ссылке!\nВам начислено +{days} дн.",
+    "signup_user": "🎁 Спасибо за регистрацию по ссылке!\nВы получили +{days} дн.",
+    "purchase_referrer": "💸 Ваш реферал совершил покупку.\nНачислено +{days} дн.",
+    "payment_100": "👏 Спасибо за оплату!\nВы получили +{days} дн. бонуса.",
+    "payment_250": "🔥 Отличная покупка!\nВы получаете +{days} дн. бонуса.",
+    "milestone_3": "🏅 У вас уже 3 платящих друга!\nПолучаете +{days} дн.",
+    "milestone_5": "🥇 Фантастика! 5 друзей оплатили.\n+{days} дн. в подарок!",
+}
+
+async def notify_bonus(context: CallbackContext, tg_id: str, days: int, reason: str):
+    msg = BONUS_MESSAGES.get(reason)
+    if not msg or days <= 0:
+        return
+    try:
+        await context.bot.send_message(chat_id=tg_id, text=msg.format(days=days))
+    except Exception:
+        pass
 
 
 def generate_referral_link(bot_username: str, tg_id: str) -> str:
@@ -46,19 +66,8 @@ async def process_signup(update: Update, context: CallbackContext, ref_tg_id: st
     if assign_referrer(user_id, ref_user_id):
         create_bonus(ref_user_id, SIGNUP_REFERRER_BONUS, "signup_owner")
         create_bonus(user_id, SIGNUP_USER_BONUS, "signup_user")
-        try:
-            await context.bot.send_message(
-                ref_tg_id,
-                "🎉 Ваш друг зарегистрировался по вашей ссылке! Вам начислено +3 дня.",
-            )
-        except Exception:
-            pass
-        try:
-            await update.message.reply_text(
-                "🎁 Вы получили +3 дня за регистрацию по реферальной ссылке!",
-            )
-        except Exception:
-            pass
+        await notify_bonus(context, ref_tg_id, SIGNUP_REFERRER_BONUS, "signup_owner")
+        await notify_bonus(context, str(update.effective_user.id), SIGNUP_USER_BONUS, "signup_user")
 
 
 async def process_purchase(context: CallbackContext, user_id: int, days: int, price: int):
@@ -67,6 +76,9 @@ async def process_purchase(context: CallbackContext, user_id: int, days: int, pr
     if referrer_id:
         ref_days = max(1, int(days * PURCHASE_REFERRER_PERCENT))
         create_bonus(referrer_id, ref_days, "purchase_referrer")
+        tg_id = get_user_tg(referrer_id)
+        if tg_id:
+            await notify_bonus(context, tg_id, ref_days, "purchase_referrer")
 
         if not has_bonus(user_id, "first_paid"):
             create_bonus(user_id, 0, "first_paid")
@@ -74,10 +86,15 @@ async def process_purchase(context: CallbackContext, user_id: int, days: int, pr
             bonus_days = MILESTONE_BONUSES.get(count)
             if bonus_days:
                 create_bonus(referrer_id, bonus_days, f"milestone_{count}")
+                if tg_id:
+                    await notify_bonus(context, tg_id, bonus_days, f"milestone_{count}")
 
     for threshold, bonus in sorted(PAYMENT_BONUS_TIERS.items(), reverse=True):
         if price >= threshold and not has_bonus(user_id, f"payment_{threshold}"):
             create_bonus(user_id, bonus, f"payment_{threshold}")
+            user_tg = get_user_tg(user_id)
+            if user_tg:
+                await notify_bonus(context, user_tg, bonus, f"payment_{threshold}")
             break
 
 

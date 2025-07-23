@@ -139,6 +139,13 @@ def get_or_create_user(tg_id: str):
             conn.commit()
             return cursor.lastrowid, 0
 
+def get_user_tg(user_id: int) -> str:
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT tg_id FROM users WHERE id = ?", (user_id,))
+        row = cursor.fetchone()
+        return row[0] if row else None
+
 def mark_notified(key_id: int):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
