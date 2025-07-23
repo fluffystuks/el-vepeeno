@@ -29,7 +29,6 @@ async def start(update: Update, context: CallbackContext):
                 InlineKeyboardButton("📜 Инструкция", callback_data="instruction"),
                 InlineKeyboardButton("💬 Поддержка", callback_data="help")
             ],
-            [InlineKeyboardButton("🎁 Реферальная программа", callback_data="referral")]
         ]
 
     else:

@@ -5,7 +5,6 @@ from db import (
     save_payment, get_last_payment_id, update_payment_status,
     update_balance, get_payment_amount
 )
-from handlers.referral import process_first_payment
 from services.payment_service import create_payment, check_payment
 
 PAYMENT_AMOUNT = 1
@@ -122,8 +121,6 @@ async def check_payment_handler(update: Update, context: CallbackContext):
         amount = get_payment_amount(payment_id)
         new_balance = balance + amount
         update_balance(user_id, new_balance)
-
-        await process_first_payment(context, user_id, amount)
 
         await target.reply_text(
             f"✅ <b>Платёж успешно прошёл!</b>\n\n"

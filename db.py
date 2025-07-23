@@ -331,6 +331,31 @@ def create_bonus(user_id: int, days: int, reason: str):
         conn.commit()
 
 
+def has_bonus(user_id: int, reason: str) -> bool:
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM bonuses WHERE user_id = ? AND reason = ? LIMIT 1",
+            (user_id, reason),
+        )
+        return cursor.fetchone() is not None
+
+
+def get_user_bonuses(user_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT days, reason, expiry_time, status, created_at
+            FROM bonuses
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            """,
+            (user_id,),
+        )
+        return cursor.fetchall()
+
+
 def get_bonus(bonus_id: int):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()

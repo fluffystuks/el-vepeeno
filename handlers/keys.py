@@ -1,6 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 from db import get_or_create_user, update_balance, add_key, is_trial_used, mark_trial_used
+from handlers.referral import process_purchase
 from services.key_service import generate_key
 import datetime
 
@@ -121,8 +122,10 @@ async def tariff_handler(update: Update, context: CallbackContext):
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup(
                     [[InlineKeyboardButton("🔙 В меню", callback_data="back")]]
-                )
+                ),
             )
+
+            await process_purchase(context, user_id, days, price)
         else:
             await query.edit_message_text(
                 f"{result}",
