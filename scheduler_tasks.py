@@ -2,6 +2,8 @@
 from config import ADMIN_TG_ID
 import math
 from datetime import datetime
+from pathlib import Path
+import shutil
 from db import (
     get_expiring_keys,
     deactivate_key,
@@ -68,12 +70,6 @@ async def handle_key_notification(bot, key):
             message = text.format(email=email)
             await bot.send_message(chat_id=tg_id, text=message, parse_mode="Markdown")
             update_notified_level(key_id, level)
-            log_message = f"[📨] TG ID {tg_id} — {message}"
-            if ADMIN_TG_ID:
-                try:
-                    await bot.send_message(chat_id=ADMIN_TG_ID, text=log_message)
-                except Exception as e:
-                    print(f"❌ Не удалось отправить админу: {e}")
             break
 
 
@@ -96,3 +92,39 @@ async def check_bonuses_once(context):
                 await bot.send_message(chat_id=bonus["tg_id"], text=message)
             except Exception:
                 pass
+
+
+async def backup_db_once(context):
+    bot = context.bot
+    now = datetime.now().strftime("%H:%M:%S")
+    print(f"[{now}] 💾 Создание бэкапа базы данных")
+    if ADMIN_TG_ID:
+        try:
+            await bot.send_message(chat_id=ADMIN_TG_ID, text="💾 Создание бэкапа базы данных")
+        except Exception as e:
+            print(f"❌ Не удалось отправить админу: {e}")
+
+    base_dir = Path.home() / "el-vepeeno"
+    db_path = base_dir / "vpn_bot.db"
+    backups_dir = base_dir / "backups"
+    backups_dir.mkdir(exist_ok=True)
+
+    if db_path.exists():
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = backups_dir / f"vpn_bot_{timestamp}.db"
+        shutil.copy2(db_path, backup_file)
+        msg = f"📁 Бэкап сохранён: {backup_file}"
+        print(msg)
+        if ADMIN_TG_ID:
+            try:
+                await bot.send_message(chat_id=ADMIN_TG_ID, text=msg)
+            except Exception as e:
+                print(f"❌ Не удалось отправить админу: {e}")
+    else:
+        msg = f"❌ База данных не найдена: {db_path}"
+        print(msg)
+        if ADMIN_TG_ID:
+            try:
+                await bot.send_message(chat_id=ADMIN_TG_ID, text=msg)
+            except Exception as e:
+                print(f"❌ Не удалось отправить админу: {e}")

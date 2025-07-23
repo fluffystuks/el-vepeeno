@@ -274,6 +274,14 @@ def get_key_owner(key_id: int):
         return row[0] if row else None
 
 
+def delete_key(key_id: int) -> None:
+    """Remove key entry from database."""
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM keys WHERE id = ?", (key_id,))
+        conn.commit()
+
+
 def assign_referrer(user_id: int, referrer_id: int) -> bool:
     if user_id == referrer_id:
         return False
