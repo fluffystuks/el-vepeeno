@@ -122,12 +122,16 @@ async def check_payment_handler(update: Update, context: CallbackContext):
         new_balance = balance + amount
         update_balance(user_id, new_balance)
 
+        markup = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🔙 В меню", callback_data="back")]]
+        )
         await target.reply_text(
             f"✅ <b>Платёж успешно прошёл!</b>\n\n"
             f"💰 Пополнено: <b>{amount} RUB</b>\n"
             f"💳 Новый баланс: <b>{new_balance} RUB</b>\n\n"
-            f"Спасибо за поддержку сервиса! ❤️",
-            parse_mode="HTML"
+            "Спасибо за поддержку сервиса! ❤️",
+            parse_mode="HTML",
+            reply_markup=markup,
         )
 
 
