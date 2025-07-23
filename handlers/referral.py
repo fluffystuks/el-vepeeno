@@ -1,6 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 from datetime import datetime
+import time
 from db import (
     get_or_create_user,
     assign_referrer,
@@ -114,7 +115,12 @@ async def list_bonuses(update: Update, context: CallbackContext):
 
     history = "\n".join(lines) if lines else "Нет активных бонусов."
 
-    text = f"*Мои бонусы:*\n{history}\n\n*Баланс:* {balance} дн."
+    text = (
+        "🎁 *Ваши активные бонусы:*\n\n"
+        f"{history}\n\n"
+        f"💰 *Бонусный баланс:* *{balance} дн.*\n\n"
+        "🔧 Используйте бонусы, чтобы продлить ключ доступа к VPN."
+    )
 
     keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="referral")]]
     if balance:
@@ -142,8 +148,11 @@ async def choose_bonus_key(update: Update, context: CallbackContext):
         await query.edit_message_text("У вас нет ключей.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data="show_bonuses")]]))
         return
     keyboard = []
-    for key_id, email, *_ in keys:
-        keyboard.append([InlineKeyboardButton(email, callback_data=f"apply_bonus_{key_id}")])
+    for key_id, email, expiry_ms, active in keys:
+        days_left = max(0, (expiry_ms // 1000 - int(time.time())) // 86400)
+        status = "✅ Активен" if active else "❌ Не активен"
+        text = f"🇩🇪 {email} — {days_left} дн. {status}"
+        keyboard.append([InlineKeyboardButton(text, callback_data=f"apply_bonus_{key_id}")])
     keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data="show_bonuses")])
     await query.edit_message_text(
         "Выберите ключ, к которому применить бонусы:",
@@ -190,15 +199,19 @@ async def referral_menu(update: Update, context: CallbackContext):
 
     keyboard = [
         [InlineKeyboardButton("🎁 Мои бонусы", callback_data="show_bonuses")],
+        [InlineKeyboardButton("📲 Поделиться", url=f"https://t.me/share/url?url={link}")],
         [InlineKeyboardButton("🔙 В меню", callback_data="back")],
     ]
 
     text = (
-        "*Реферальная программа*\n\n"
-        "• +3 дня за регистрацию друга по вашей ссылке\n"
-        "• +20% дней от каждой его покупки\n"
-        "• +10 дней за 3 платящих друга, +15 дней за 5\n\n"
-        f"🔗 *Ваша ссылка:*\n`{link}`"
+        "🏆 *Реферальная программа*\n\n"
+        "Зови друзей — и получи классные бонусы:\n\n"
+        "• 🎉 +3 дня — за регистрацию друга\n"
+        "• 💸 +20% бонуса от его каждой покупки (например, покупка на 30\u202fдн → ты получаешь 6\u202fдн, на 90\u202f → 18\u202fдн)\n"
+        "• 🏅 +10 дней — за 3 платящих друга\n"
+        "• 🥇 +15 дней — за 5 платящих\n\n"
+        f"🔗 *Ваша ссылка:* `{link}`\n\n"
+        "👉 Нажми \u00abПоделиться\u00bb, чтобы отправить ссылку друзьям и начать собирать бонусы!"
     )
 
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
