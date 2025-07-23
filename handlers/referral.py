@@ -8,12 +8,13 @@ from db import (
     increment_paid_referrals,
     count_successful_payments,
     get_user_active_bonuses,
-    mark_bonus_used,
-    get_bonus,
+    get_bonus_balance,
+    consume_all_bonuses,
     get_key_by_id,
     update_key_expiry,
     reset_notified_level,
     get_key_owner,
+    get_all_keys,
 )
 from services.extend_service import extend_key
 
@@ -70,39 +71,38 @@ async def process_first_payment(context: CallbackContext, user_id: int, amount: 
 def format_bonus(bonus):
     from datetime import datetime
     expiry = datetime.fromtimestamp(bonus[3]).strftime('%d.%m.%Y')
-    return f"ID {bonus[0]} — +{bonus[1]} дн. до {expiry} ({bonus[2]})"
+    return f"+{bonus[1]} дн. до {expiry} ({bonus[2]})"
 
 
 async def list_bonuses(update: Update, context: CallbackContext):
     tg_id = str(update.effective_user.id)
     user_id, _ = get_or_create_user(tg_id)
+    balance = get_bonus_balance(user_id)
     bonuses = get_user_active_bonuses(user_id)
-    if not bonuses:
-        await update.message.reply_text("У вас нет активных бонусов.")
-        return
-    text = "Ваши бонусы:\n" + "\n".join(format_bonus(b) for b in bonuses)
-    text += "\nИспользуйте /apply_bonus <bonus_id> <key_id>"
+    if balance <= 0:
+        text = "У вас нет бонусов."
+    else:
+        text = f"Ваш бонус-баланс: {balance} дн."  # Russian
+        if bonuses:
+            text += "\n\nАктивные бонусы:\n" + "\n".join(format_bonus(b) for b in bonuses)
     await update.message.reply_text(text)
 
 
 async def apply_bonus(update: Update, context: CallbackContext):
     args = context.args
-    if len(args) < 2:
-        await update.message.reply_text("Использование: /apply_bonus <bonus_id> <key_id>")
+    if len(args) < 1:
+        await update.message.reply_text("Использование: /apply_bonus <key_id>")
         return
     try:
-        bonus_id = int(args[0])
-        key_id = int(args[1])
+        key_id = int(args[0])
     except ValueError:
         await update.message.reply_text("ID должны быть числами")
         return
     tg_id = str(update.effective_user.id)
     user_id, _ = get_or_create_user(tg_id)
-    bonus = get_bonus(bonus_id)
-    from datetime import datetime
-    now = int(datetime.now().timestamp())
-    if not bonus or bonus[1] != user_id or bonus[5] != 'active' or bonus[4] <= now:
-        await update.message.reply_text("Бонус не найден или недоступен")
+    total_days = consume_all_bonuses(user_id)
+    if total_days <= 0:
+        await update.message.reply_text("У вас нет бонусов")
         return
     owner = get_key_owner(key_id)
     if owner != user_id:
@@ -113,12 +113,11 @@ async def apply_bonus(update: Update, context: CallbackContext):
         await update.message.reply_text("Ключ не найден")
         return
     email, _, expiry_ms, client_id, active = key
-    result = extend_key(email, client_id, active, expiry_ms, bonus[2])
+    result = extend_key(email, client_id, active, expiry_ms, total_days)
     if result:
         update_key_expiry(key_id, result)
         reset_notified_level(key_id)
-        mark_bonus_used(bonus_id)
-        await update.message.reply_text(f"✅ Бонус применён, ключ продлён на {bonus[2]} дней")
+        await update.message.reply_text(f"✅ Бонус применён, ключ продлён на {total_days} дней")
     else:
         await update.message.reply_text("❌ Ошибка при продлении")
 
@@ -131,6 +130,7 @@ async def referral_menu(update: Update, context: CallbackContext):
 
     keyboard = [
         [InlineKeyboardButton("🎁 Мои бонусы", callback_data="show_bonuses")],
+        [InlineKeyboardButton("🖊 Использовать", callback_data="use_bonus")],
         [InlineKeyboardButton("🔙 В меню", callback_data="back")],
     ]
 
@@ -148,13 +148,69 @@ async def show_bonuses(update: Update, context: CallbackContext):
     await query.answer()
     tg_id = str(query.from_user.id)
     user_id, _ = get_or_create_user(tg_id)
+    balance = get_bonus_balance(user_id)
     bonuses = get_user_active_bonuses(user_id)
-    if not bonuses:
-        text = "У вас нет активных бонусов."
+    if balance <= 0:
+        text = "У вас нет бонусов."
     else:
-        text = "Ваши бонусы:\n" + "\n".join(format_bonus(b) for b in bonuses)
-        text += "\nИспользуйте /apply_bonus <bonus_id> <key_id>"
+        text = f"Ваш бонус-баланс: {balance} дн."
+        if bonuses:
+            text += "\n\nАктивные бонусы:\n" + "\n".join(format_bonus(b) for b in bonuses)
 
-    keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="referral")]]
+    keyboard = [
+        [InlineKeyboardButton("🖊 Использовать", callback_data="use_bonus")],
+        [InlineKeyboardButton("🔙 Назад", callback_data="referral")],
+    ]
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+
+async def use_bonus_menu(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    tg_id = str(query.from_user.id)
+    user_id, _ = get_or_create_user(tg_id)
+    balance = get_bonus_balance(user_id)
+    if balance <= 0:
+        keyboard = [[InlineKeyboardButton("\ud83d\udd19 \u041d\u0430\u0437\u0430\u0434", callback_data="referral")]]
+        await query.edit_message_text("\u0423 \u0432\u0430\u0441 \u043d\u0435\u0442 \u0431\u043e\u043d\u0443\u0441\u043e\u0432.", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    keys = get_all_keys(user_id)
+    if not keys:
+        keyboard = [[InlineKeyboardButton("\ud83d\udd19 \u041d\u0430\u0437\u0430\u0434", callback_data="referral")]]
+        await query.edit_message_text("\u0423 \u0432\u0430\u0441 \u043d\u0435\u0442 \u043a\u043b\u044e\u0447\u0435\u0439.", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    keyboard = [[InlineKeyboardButton(k[1], callback_data=f"use_bonus_key_{k[0]}")] for k in keys]
+    keyboard.append([InlineKeyboardButton("\ud83d\udd19 \u041d\u0430\u0437\u0430\u0434", callback_data="show_bonuses")])
+    await query.edit_message_text("\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043a\u043b\u044e\u0447:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def apply_bonus_callback(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split("_")
+    key_id = int(parts[-1])
+    tg_id = str(query.from_user.id)
+    user_id, _ = get_or_create_user(tg_id)
+    owner = get_key_owner(key_id)
+    if owner != user_id:
+        await query.edit_message_text("\u041a\u043b\u044e\u0447 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d.")
+        return
+    total_days = consume_all_bonuses(user_id)
+    if total_days <= 0:
+        await query.edit_message_text("\u0423 \u0432\u0430\u0441 \u043d\u0435\u0442 \u0431\u043e\u043d\u0443\u0441\u043e\u0432.")
+        return
+    key = get_key_by_id(key_id)
+    if not key:
+        await query.edit_message_text("\u041a\u043b\u044e\u0447 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d.")
+        return
+    email, _, expiry_ms, client_id, active = key
+    result = extend_key(email, client_id, active, expiry_ms, total_days)
+    if result:
+        update_key_expiry(key_id, result)
+        reset_notified_level(key_id)
+        text = f"\u2705 \u0411\u043e\u043d\u0443\u0441 {total_days} \u0434\u043d. \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d \u043a \u043a\u043b\u044e\u0447\u0443 {email}"
+    else:
+        text = "\u274c \u041e\u0448\u0438\u0431\u043a\u0430 \u043f\u0440\u0438 \u043f\u0440\u043e\u0434\u043b\u0435\u043d\u0438\u0438"
+    keyboard = [[InlineKeyboardButton("\ud83d\udd19 \u041c\u0435\u043d\u044e", callback_data="referral")]]
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 

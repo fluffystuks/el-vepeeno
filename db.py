@@ -377,6 +377,27 @@ def get_user_active_bonuses(user_id: int):
         return cursor.fetchall()
 
 
+def get_bonus_balance(user_id: int) -> int:
+    bonuses = get_user_active_bonuses(user_id)
+    return sum(b[1] for b in bonuses)
+
+
+def consume_all_bonuses(user_id: int) -> int:
+    bonuses = get_user_active_bonuses(user_id)
+    ids = [b[0] for b in bonuses]
+    total = sum(b[1] for b in bonuses)
+    if not ids:
+        return 0
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.executemany(
+            "UPDATE bonuses SET status = 'used' WHERE id = ?",
+            [(bid,) for bid in ids],
+        )
+        conn.commit()
+    return total
+
+
 def get_all_active_bonuses():
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
