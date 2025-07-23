@@ -89,7 +89,9 @@ async def list_bonuses(update: Update, context: CallbackContext):
     bonuses = get_user_active_bonuses(user_id)
     lines = []
     for _, days, reason, expiry in bonuses:
-        reason_text = REASON_TEXTS.get(reason, reason)
+        if days <= 0:
+            continue
+        reason_text = REASON_TEXTS.get(reason, reason.replace('_', '\\_'))
         exp = datetime.fromtimestamp(expiry).strftime("%d.%m")
         lines.append(f"+{days} дн. — {reason_text} (до {exp})")
 

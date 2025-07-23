@@ -318,7 +318,7 @@ def get_paid_referrals_count(user_id: int) -> int:
 
 
 def create_bonus(user_id: int, days: int, reason: str):
-    expiry = int(time.time()) + 30 * 86400
+    expiry = int(time.time()) + 15 * 86400
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
         cursor.execute(

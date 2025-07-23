@@ -86,6 +86,8 @@ async def check_bonuses_once(context):
         if bonus["expiry_time"] <= now:
             expire_bonus(bonus["id"])
             continue
+        if bonus["days"] <= 0:
+            continue
         if days_left in (7, 1):
             message = (
                 f"🎁 Ваш бонус +{bonus['days']} дн. истекает через {days_left} дн."
