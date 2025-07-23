@@ -2,6 +2,8 @@
 from config import ADMIN_TG_ID
 import math
 from datetime import datetime
+from pathlib import Path
+import shutil
 from db import (
     get_expiring_keys,
     deactivate_key,
@@ -96,3 +98,20 @@ async def check_bonuses_once(context):
                 await bot.send_message(chat_id=bonus["tg_id"], text=message)
             except Exception:
                 pass
+
+
+async def backup_db_once(context):
+    now = datetime.now().strftime("%H:%M:%S")
+    print(f"[{now}] 💾 Создание бэкапа базы данных")
+    base_dir = Path(__file__).parent
+    db_path = base_dir / "vpn_bot.db"
+    backups_dir = base_dir / "backups"
+    backups_dir.mkdir(exist_ok=True)
+
+    if db_path.exists():
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = backups_dir / f"vpn_bot_{timestamp}.db"
+        shutil.copy2(db_path, backup_file)
+        print(f"📁 Бэкап сохранён: {backup_file}")
+    else:
+        print(f"❌ База данных не найдена: {db_path}")
