@@ -26,7 +26,12 @@ from handlers.payment import (
     timeout_handler
 )
 from handlers.keys import connect_handler, tariff_handler
-from handlers.account import account_handler, show_key_handler
+from handlers.account import (
+    account_handler,
+    show_key_handler,
+    delete_key_prompt,
+    delete_key_confirm,
+)
 from handlers.extend import extend_key_handler
 from handlers.misc import help_handler, instruction_handler, rules_handler
 from handlers.referral import (
@@ -98,6 +103,8 @@ def main():
     application.add_handler(CallbackQueryHandler(rules_handler, pattern="^rules$"))
     application.add_handler(CallbackQueryHandler(extend_key_handler, pattern="^extend_"))
     application.add_handler(CallbackQueryHandler(show_key_handler, pattern="^key_"))
+    application.add_handler(CallbackQueryHandler(delete_key_prompt, pattern="^delete_"))
+    application.add_handler(CallbackQueryHandler(delete_key_confirm, pattern="^confirm_delete_"))
     application.add_handler(CallbackQueryHandler(check_payment_handler, pattern="^check_payment$"))
     application.add_handler(CallbackQueryHandler(cancel_payment_handler, pattern="^cancel_payment$"))
     application.add_handler(CallbackQueryHandler(connect_handler, pattern="^connect$"))

@@ -50,7 +50,6 @@ async def show_key_handler(update: Update, context: CallbackContext):
     callback_data = query.data  # key_123
     key_id = int(callback_data.split("_")[1])
 
-    from db import get_key_by_id
     key = get_key_by_id(key_id)
     if not key:
         await query.answer("Ключ не найден.", show_alert=True)
@@ -72,6 +71,7 @@ async def show_key_handler(update: Update, context: CallbackContext):
     keyboard = [
         [InlineKeyboardButton("⏳ Продлить на 30 дней — 100 RUB", callback_data=f"extend_{key_id}_30")],
         [InlineKeyboardButton("⏳ Продлить на 60 дней — 180 RUB", callback_data=f"extend_{key_id}_60")],
+        [InlineKeyboardButton("🗑 Удалить ключ", callback_data=f"delete_{key_id}")],
         [InlineKeyboardButton("🔙 Назад", callback_data="account")]
     ]
     markup = InlineKeyboardMarkup(keyboard)
@@ -81,3 +81,50 @@ async def show_key_handler(update: Update, context: CallbackContext):
         parse_mode="Markdown",
         reply_markup=markup
     )
+
+
+async def delete_key_prompt(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    key_id = int(query.data.split("_")[1])
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Подтвердить", callback_data=f"confirm_delete_{key_id}"),
+            InlineKeyboardButton("❌ Отмена", callback_data=f"key_{key_id}")
+        ]
+    ]
+    markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        "Вы точно хотите удалить этот ключ?", reply_markup=markup
+    )
+
+
+async def delete_key_confirm(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    key_id = int(query.data.split("_")[2])
+    key = get_key_by_id(key_id)
+    if not key:
+        await query.edit_message_text("Ключ не найден.")
+        return
+
+    _, _, _, client_id, _ = key
+    from services.delete_service import delete_client
+    from db import delete_key as db_delete
+
+    if delete_client(client_id):
+        db_delete(key_id)
+        await query.edit_message_text(
+            "✅ Ключ удалён.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🔙 В меню", callback_data="account")]]
+            ),
+        )
+    else:
+        await query.edit_message_text(
+            "❌ Ошибка при удалении.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🔙 Назад", callback_data=f"key_{key_id}")]]
+            ),
+        )
