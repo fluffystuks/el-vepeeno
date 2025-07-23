@@ -14,7 +14,13 @@ from db import (
 
 async def check_keys_once(context):
     bot = context.bot
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] 🔄 Проверка ключей")
+    start_msg = f"[{datetime.now().strftime('%H:%M:%S')}] 🔄 Проверка ключей"
+    print(start_msg)
+    if ADMIN_TG_ID:
+        try:
+            await bot.send_message(chat_id=ADMIN_TG_ID, text=start_msg)
+        except Exception as e:
+            print(f"❌ Не удалось отправить админу: {e}")
 
     keys = get_expiring_keys()
     for key in keys:
@@ -96,13 +102,22 @@ async def check_bonuses_once(context):
             )
             try:
                 await bot.send_message(chat_id=bonus["tg_id"], text=message)
+                if ADMIN_TG_ID:
+                    await bot.send_message(chat_id=ADMIN_TG_ID, text=f"[Бонус] TG ID {bonus['tg_id']} — {message}")
             except Exception:
                 pass
 
 
 async def backup_db_once(context):
+    bot = context.bot
     now = datetime.now().strftime("%H:%M:%S")
     print(f"[{now}] 💾 Создание бэкапа базы данных")
+    if ADMIN_TG_ID:
+        try:
+            await bot.send_message(chat_id=ADMIN_TG_ID, text="💾 Создание бэкапа базы данных")
+        except Exception as e:
+            print(f"❌ Не удалось отправить админу: {e}")
+
     base_dir = Path(__file__).parent
     db_path = base_dir / "vpn_bot.db"
     backups_dir = base_dir / "backups"
@@ -112,6 +127,18 @@ async def backup_db_once(context):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_file = backups_dir / f"vpn_bot_{timestamp}.db"
         shutil.copy2(db_path, backup_file)
-        print(f"📁 Бэкап сохранён: {backup_file}")
+        msg = f"📁 Бэкап сохранён: {backup_file}"
+        print(msg)
+        if ADMIN_TG_ID:
+            try:
+                await bot.send_message(chat_id=ADMIN_TG_ID, text=msg)
+            except Exception as e:
+                print(f"❌ Не удалось отправить админу: {e}")
     else:
-        print(f"❌ База данных не найдена: {db_path}")
+        msg = f"❌ База данных не найдена: {db_path}"
+        print(msg)
+        if ADMIN_TG_ID:
+            try:
+                await bot.send_message(chat_id=ADMIN_TG_ID, text=msg)
+            except Exception as e:
+                print(f"❌ Не удалось отправить админу: {e}")
