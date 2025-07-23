@@ -29,6 +29,7 @@ from handlers.keys import connect_handler, tariff_handler
 from handlers.account import account_handler, show_key_handler
 from handlers.extend import extend_key_handler
 from handlers.misc import help_handler, instruction_handler, rules_handler
+from handlers.referral import list_bonuses, apply_bonus
 from services.key_service import login
 from scheduler import start_scheduler
 
@@ -63,7 +64,8 @@ async def post_init(application):
     await application.bot.set_my_commands([
         BotCommand("start", "Запустить бота"),
         BotCommand("pay", "Пополнить баланс"),
-        BotCommand("check_payment", "Проверить платёж")
+        BotCommand("check_payment", "Проверить платёж"),
+        BotCommand("bonuses", "Список бонусов")
     ])
     await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
@@ -81,6 +83,8 @@ def main():
 
     
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("bonuses", list_bonuses))
+    application.add_handler(CommandHandler("apply_bonus", apply_bonus))
     application.add_handler(payment_conv_handler)
     application.add_handler(CommandHandler("check_payment", check_payment_handler))
     application.add_handler(CommandHandler("cancel_payment", cancel_payment_handler))

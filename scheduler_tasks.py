@@ -2,7 +2,13 @@
 from config import ADMIN_TG_ID
 import math
 from datetime import datetime
-from db import get_expiring_keys, deactivate_key, update_notified_level
+from db import (
+    get_expiring_keys,
+    deactivate_key,
+    update_notified_level,
+    get_all_active_bonuses,
+    expire_bonus,
+)
 
 async def check_keys_once(context):
     bot = context.bot
@@ -69,3 +75,22 @@ async def handle_key_notification(bot, key):
                 except Exception as e:
                     print(f"❌ Не удалось отправить админу: {e}")
             break
+
+
+async def check_bonuses_once(context):
+    bot = context.bot
+    bonuses = get_all_active_bonuses()
+    now = int(datetime.now().timestamp())
+    for bonus in bonuses:
+        days_left = math.ceil((bonus["expiry_time"] - now) / 86400)
+        if bonus["expiry_time"] <= now:
+            expire_bonus(bonus["id"])
+            continue
+        if days_left in (7, 1):
+            message = (
+                f"🎁 Ваш бонус +{bonus['days']} дн. истекает через {days_left} дн."
+            )
+            try:
+                await bot.send_message(chat_id=bonus["tg_id"], text=message)
+            except Exception:
+                pass

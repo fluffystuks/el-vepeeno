@@ -11,7 +11,10 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tg_id TEXT UNIQUE,
                 balance REAL DEFAULT 0,
-                trial_used INTEGER DEFAULT 0
+                trial_used INTEGER DEFAULT 0,
+                referred_by INTEGER DEFAULT NULL,
+                paid_referrals_count INTEGER DEFAULT 0,
+                FOREIGN KEY(referred_by) REFERENCES users(id)
             );
 
             CREATE TABLE IF NOT EXISTS keys (
@@ -33,6 +36,17 @@ def init_db():
                 payment_id TEXT,
                 amount REAL,
                 status TEXT,
+                created_at INTEGER,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS bonuses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                days INTEGER,
+                reason TEXT,
+                expiry_time INTEGER,
+                status TEXT DEFAULT 'active',
                 created_at INTEGER,
                 FOREIGN KEY(user_id) REFERENCES users(id)
             );
@@ -195,6 +209,17 @@ def update_payment_status(payment_id: str, status: str):
         """, (status, payment_id))
         conn.commit()
 
+
+def count_successful_payments(user_id: int) -> int:
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM payments WHERE user_id = ? AND status = 'succeeded'",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
 def reset_notification_flag(key_id: int):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
@@ -232,3 +257,148 @@ def deactivate_key(key_id):
         cursor = conn.cursor()
         cursor.execute("UPDATE keys SET active = 0 WHERE id = ?", (key_id,))
         conn.commit()
+
+
+def get_key_owner(key_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM keys WHERE id = ?", (key_id,))
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+
+def assign_referrer(user_id: int, referrer_id: int) -> bool:
+    if user_id == referrer_id:
+        return False
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT referred_by FROM users WHERE id = ?", (user_id,))
+        current = cursor.fetchone()
+        if current and current[0]:
+            return False
+        cursor.execute(
+            "UPDATE users SET referred_by = ? WHERE id = ? AND referred_by IS NULL",
+            (referrer_id, user_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def get_user_referrer(user_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT referred_by FROM users WHERE id = ?", (user_id,))
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+
+def increment_paid_referrals(user_id: int) -> int:
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE users SET paid_referrals_count = paid_referrals_count + 1 WHERE id = ?",
+            (user_id,),
+        )
+        conn.commit()
+        cursor.execute(
+            "SELECT paid_referrals_count FROM users WHERE id = ?", (user_id,)
+        )
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
+
+def get_paid_referrals_count(user_id: int) -> int:
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT paid_referrals_count FROM users WHERE id = ?", (user_id,)
+        )
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
+
+def create_bonus(user_id: int, days: int, reason: str):
+    expiry = int(time.time()) + 30 * 86400
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO bonuses (user_id, days, reason, expiry_time, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (user_id, days, reason, expiry, int(time.time())),
+        )
+        conn.commit()
+
+
+def get_bonus(bonus_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, user_id, days, reason, expiry_time, status FROM bonuses WHERE id = ?",
+            (bonus_id,),
+        )
+        row = cursor.fetchone()
+        return row
+
+
+def mark_bonus_used(bonus_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE bonuses SET status = 'used' WHERE id = ?",
+            (bonus_id,),
+        )
+        conn.commit()
+
+
+def expire_bonus(bonus_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE bonuses SET status = 'expired' WHERE id = ?",
+            (bonus_id,),
+        )
+        conn.commit()
+
+
+def get_user_active_bonuses(user_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        now = int(time.time())
+        cursor.execute(
+            """
+            SELECT id, days, reason, expiry_time FROM bonuses
+            WHERE user_id = ? AND status = 'active' AND expiry_time > ?
+            ORDER BY expiry_time
+            """,
+            (user_id, now),
+        )
+        return cursor.fetchall()
+
+
+def get_all_active_bonuses():
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT bonuses.id, bonuses.user_id, bonuses.days, bonuses.reason,
+                   bonuses.expiry_time, users.tg_id
+            FROM bonuses
+            JOIN users ON bonuses.user_id = users.id
+            WHERE bonuses.status = 'active'
+            """
+        )
+        result = []
+        for row in cursor.fetchall():
+            result.append(
+                {
+                    "id": row[0],
+                    "user_id": row[1],
+                    "days": row[2],
+                    "reason": row[3],
+                    "expiry_time": row[4],
+                    "tg_id": row[5],
+                }
+            )
+        return result
