@@ -6,6 +6,8 @@ from db import (
     update_balance, get_payment_amount, get_pending_payment_ids
 )
 from services.payment_service import create_payment, check_payment, cancel_payment
+from yookassa import Payment
+from uuid import uuid4
 
 PAYMENT_AMOUNT = 1
 
@@ -116,6 +118,10 @@ async def check_payment_handler(update: Update, context: CallbackContext):
         return
 
     status = check_payment(payment_id)
+    if status == "waiting_for_capture":
+        Payment.capture(payment_id, idempotency_key=uuid4())
+        status = "succeeded"
+
     if status == "succeeded":
         update_payment_status(payment_id, "succeeded")
         amount = get_payment_amount(payment_id)

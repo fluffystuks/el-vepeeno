@@ -1,9 +1,9 @@
 from yookassa import Configuration, Payment
+from uuid import uuid4
 from config import YOOKASSA_ACCOUNT_ID, YOOKASSA_SECRET_KEY
 from db import get_or_create_user, update_payment_status
 
-Configuration.account_id = YOOKASSA_ACCOUNT_ID
-Configuration.secret_key = YOOKASSA_SECRET_KEY
+Configuration.configure(YOOKASSA_ACCOUNT_ID, YOOKASSA_SECRET_KEY)
 
 pending_payments = {}
 
@@ -16,7 +16,7 @@ def create_payment(tg_id, amount, user_email=None):
 
         payment_data = {
             "amount": {"value": str(amount), "currency": "RUB"},
-            "capture": True,
+            "capture": False,
             "confirmation": {"type": "redirect", "return_url": "https://t.me/pieno_bot"},
             "description": f"Пополнение баланса пользователя {tg_id}",
             "metadata": {"order_id": str(tg_id)},
@@ -38,7 +38,7 @@ def create_payment(tg_id, amount, user_email=None):
             }
         }
 
-        payment = Payment.create(payment_data)
+        payment = Payment.create(payment_data, idempotency_key=uuid4())
         pending_payments[payment.id] = {"user_id": user_id, "tg_id": tg_id, "amount": amount}
 
         return payment.confirmation.confirmation_url, payment.id
@@ -59,7 +59,7 @@ def check_payment(payment_id):
 def cancel_payment(payment_id):
     """Cancel a pending payment via the YooKassa API."""
     try:
-        Payment.cancel(payment_id)
+        Payment.cancel(payment_id, idempotency_key=uuid4())
         update_payment_status(payment_id, "canceled")
         pending_payments.pop(payment_id, None)
         return True
