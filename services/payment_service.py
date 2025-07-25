@@ -1,6 +1,6 @@
 from yookassa import Configuration, Payment
 from config import YOOKASSA_ACCOUNT_ID, YOOKASSA_SECRET_KEY
-from db import get_or_create_user
+from db import get_or_create_user, update_payment_status
 
 Configuration.account_id = YOOKASSA_ACCOUNT_ID
 Configuration.secret_key = YOOKASSA_SECRET_KEY
@@ -57,10 +57,11 @@ def check_payment(payment_id):
 
 
 def cancel_payment(payment_id):
+    """Cancel a pending payment via the YooKassa API."""
     try:
         Payment.cancel(payment_id)
-        if payment_id in pending_payments:
-            pending_payments.pop(payment_id)
+        update_payment_status(payment_id, "canceled")
+        pending_payments.pop(payment_id, None)
         return True
     except Exception as e:
         print(f"Ошибка при отмене платежа: {e}")

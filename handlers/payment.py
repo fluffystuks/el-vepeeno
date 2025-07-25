@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import CallbackContext, ConversationHandler
 from db import (
-    get_or_create_user, has_pending_payment, cancel_pending_payment,
+    get_or_create_user, has_pending_payment,
     save_payment, get_last_payment_id, update_payment_status,
     update_balance, get_payment_amount, get_pending_payment_ids
 )
@@ -167,7 +167,6 @@ async def cancel_payment_handler(update: Update, context: CallbackContext):
     payment_ids = get_pending_payment_ids(user_id)
     for pid in payment_ids:
         cancel_payment(pid)
-    cancel_pending_payment(user_id)
 
     if update.callback_query:
         await update.callback_query.answer("✅ Платёж отменён!")
