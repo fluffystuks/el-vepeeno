@@ -113,6 +113,18 @@ def cancel_pending_payment(user_id: int):
         """, (user_id,))
         conn.commit()
 
+def get_pending_payment_ids(user_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT payment_id FROM payments
+            WHERE user_id = ? AND status = 'pending'
+            """,
+            (user_id,),
+        )
+        return [row[0] for row in cursor.fetchall()]
+
 
 def is_trial_used(user_id: int) -> bool:
     with sqlite3.connect(DB_NAME) as conn:

@@ -54,3 +54,14 @@ def check_payment(payment_id):
     except Exception as e:
         print(f"Ошибка при проверке платежа: {e}")
         return None
+
+
+def cancel_payment(payment_id):
+    try:
+        Payment.cancel(payment_id)
+        if payment_id in pending_payments:
+            pending_payments.pop(payment_id)
+        return True
+    except Exception as e:
+        print(f"Ошибка при отмене платежа: {e}")
+        return False
