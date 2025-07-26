@@ -1,6 +1,7 @@
 from yookassa import Configuration, Payment
 from config import YOOKASSA_ACCOUNT_ID, YOOKASSA_SECRET_KEY
 from db import get_or_create_user
+import uuid
 
 Configuration.account_id = YOOKASSA_ACCOUNT_ID
 Configuration.secret_key = YOOKASSA_SECRET_KEY
@@ -54,3 +55,13 @@ def check_payment(payment_id):
     except Exception as e:
         print(f"Ошибка при проверке платежа: {e}")
         return None
+
+def cancel_payment(payment_id):
+    """Cancel a pending payment in YooKassa."""
+    try:
+        idempotence_key = str(uuid.uuid4())
+        Payment.cancel(payment_id, idempotence_key)
+        return True
+    except Exception as e:
+        print(f"Ошибка при отмене платежа: {e}")
+        return False

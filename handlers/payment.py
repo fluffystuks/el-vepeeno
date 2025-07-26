@@ -1,11 +1,17 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import CallbackContext, ConversationHandler
 from db import (
-    get_or_create_user, has_pending_payment, cancel_pending_payment,
-    save_payment, get_last_payment_id, update_payment_status,
-    update_balance, get_payment_amount
+    get_or_create_user,
+    has_pending_payment,
+    cancel_pending_payment,
+    save_payment,
+    get_last_payment_id,
+    update_payment_status,
+    update_balance,
+    get_payment_amount,
+    get_pending_payment_ids,
 )
-from services.payment_service import create_payment, check_payment
+from services.payment_service import create_payment, check_payment, cancel_payment
 
 PAYMENT_AMOUNT = 1
 
@@ -164,6 +170,9 @@ async def check_payment_handler(update: Update, context: CallbackContext):
 async def cancel_payment_handler(update: Update, context: CallbackContext):
     tg_id = str(update.effective_user.id)
     user_id, _ = get_or_create_user(tg_id)
+    pending_ids = get_pending_payment_ids(user_id)
+    for p_id in pending_ids:
+        cancel_payment(p_id)
     cancel_pending_payment(user_id)
 
     if update.callback_query:
