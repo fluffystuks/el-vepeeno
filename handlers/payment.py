@@ -158,9 +158,6 @@ async def check_payment_handler(update: Update, context: CallbackContext):
             parse_mode="HTML"
         )
 
-# ================================================
-# Отмена вручную
-# ================================================
 async def cancel_payment_handler(update: Update, context: CallbackContext):
     tg_id = str(update.effective_user.id)
     user_id, _ = get_or_create_user(tg_id)

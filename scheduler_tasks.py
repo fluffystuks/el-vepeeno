@@ -70,6 +70,12 @@ async def handle_key_notification(bot, key):
             message = text.format(email=email)
             await bot.send_message(chat_id=tg_id, text=message, parse_mode="Markdown")
             update_notified_level(key_id, level)
+            log_message = f"[📨] TG ID {tg_id} — {message}"
+            if ADMIN_TG_ID:
+                try:
+                    await bot.send_message(chat_id=ADMIN_TG_ID, text=log_message)
+                except Exception as e:
+                    print(f"❌ Не удалось отправить админу: {e}")
             break
 
 
