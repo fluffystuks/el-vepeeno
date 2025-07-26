@@ -3,6 +3,7 @@
 venv/
 pisun.py
 .venv/
+sqlite3.exe
 # Игнорируем кэш Python
 __pycache__/
 *.pyc
