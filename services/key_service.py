@@ -31,10 +31,11 @@ def generate_random_string(length=6):
     return ''.join(random.choices(string.ascii_uppercase, k=length))
 
 def generate_client():
+    in_email_id = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ', k=6))
     return {
-        "id": str(uuid.uuid4()),
-        "flow": "",
-        "email": f"Germany_{''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ', k=6))}",
+        "id": f"Pieno_{in_email_id}",
+        "flow": "xtls-rprx-vision",
+        "email": f"🇩🇪 Германия ({in_email_id})",
         "limitIp": 3,
         "totalGB": 0,
         "expiryTime": 0,
