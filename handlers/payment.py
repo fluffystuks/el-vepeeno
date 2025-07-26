@@ -1,11 +1,21 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import CallbackContext, ConversationHandler
 from db import (
-    get_or_create_user, has_pending_payment,
-    save_payment, get_last_payment_id, update_payment_status,
-    update_balance, get_payment_amount, get_pending_payment_ids
+    get_or_create_user,
+    has_pending_payment,
+    save_payment,
+    get_last_payment_id,
+    update_payment_status,
+    update_balance,
+    get_payment_amount,
+    get_pending_payment_ids,
+    cancel_pending_payment,
 )
-from services.payment_service import create_payment, check_payment, cancel_payment
+from services.payment_service import (
+    create_payment,
+    check_payment,
+    cancel_payment,
+)
 from yookassa import Payment
 from uuid import uuid4
 
@@ -173,6 +183,9 @@ async def cancel_payment_handler(update: Update, context: CallbackContext):
     payment_ids = get_pending_payment_ids(user_id)
     for pid in payment_ids:
         cancel_payment(pid)
+
+    # ensure database reflects cancellation even if API call failed
+    cancel_pending_payment(user_id)
 
     if update.callback_query:
         await update.callback_query.answer("✅ Платёж отменён!")

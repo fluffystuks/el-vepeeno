@@ -59,10 +59,13 @@ def check_payment(payment_id):
 def cancel_payment(payment_id):
     """Cancel a pending payment via the YooKassa API."""
     try:
-        Payment.cancel(payment_id, idempotency_key=uuid4())
-        update_payment_status(payment_id, "canceled")
-        pending_payments.pop(payment_id, None)
-        return True
+        result = Payment.cancel(payment_id, idempotency_key=uuid4())
+        if getattr(result, "status", None) == "canceled":
+            update_payment_status(payment_id, "canceled")
+            pending_payments.pop(payment_id, None)
+            return True
+        print(f"Не удалось отменить платёж {payment_id}: статус {getattr(result, 'status', 'unknown')}")
+        return False
     except Exception as e:
         print(f"Ошибка при отмене платежа: {e}")
         return False
