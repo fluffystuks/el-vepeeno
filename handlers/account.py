@@ -20,7 +20,7 @@ async def account_handler(update: Update, context: CallbackContext):
         days_left = max(0, (expiry_ms // 1000 - int(time.time())) // 86400)
         expiry_date = datetime.datetime.fromtimestamp(expiry_ms // 1000).strftime('%d.%m.%Y')
         status = "✅ Активен" if active else "❌ Не активен"
-        text = f"🇩🇪 {email} — {days_left} дн. {status}"
+        text = f"{email} — {days_left} дн. {status}"
 
         keyboard.append([InlineKeyboardButton(text, callback_data=f"key_{key_id}")])
 
