@@ -165,7 +165,7 @@ async def apply_bonus_button(update: Update, context: CallbackContext):
         return
     email, _, expiry, client_id, active, inbound_id = key
     if inbound_id == 2:
-        await query.edit_message_text("Старый ключ нельзя продлить, перенесите его на новый.")
+        await query.edit_message_text("Старый ключ нельзя продлить. Используйте новый.")
         return
     result = extend_key(email, client_id, active, expiry, days, inbound_id=1)
     if result:

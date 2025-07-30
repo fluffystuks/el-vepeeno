@@ -100,3 +100,38 @@ def create_key_with_expiry(expiry_time_s: int, inbound_id: int = 1):
             "client_id": client_id,
         }
     return None
+
+
+def update_client_expiry(client_id: str, email: str, expiry_time_s: int, inbound_id: int = 1) -> bool:
+    """Update existing client's expiry time."""
+    if not session.SESSION_KEY:
+        return False
+
+    client_payload = {
+        "id": client_id,
+        "flow": "",
+        "email": email,
+        "limitIp": 0,
+        "totalGB": 0,
+        "expiryTime": int(expiry_time_s) * 1000,
+        "enable": True,
+        "tgId": "",
+        "subId": "",
+        "reset": 0,
+    }
+
+    payload = {"id": inbound_id, "settings": json.dumps({"clients": [client_payload]})}
+
+    resp = requests.post(
+        f"{API_URL}/panel/api/inbounds/updateClient/{client_id}",
+        json=payload,
+        headers={"Cookie": f"3x-ui={session.SESSION_KEY}"},
+    )
+
+    if resp.status_code == 200:
+        try:
+            data = resp.json()
+        except ValueError:
+            return False
+        return data.get("success", False)
+    return False

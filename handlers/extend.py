@@ -21,7 +21,7 @@ async def extend_key_handler(update, context):
     email, link, expiry, client_id, active, inbound_id = key
 
     if inbound_id == 2:
-        await query.answer("Ключ устарел. Перенесите его на новый сервер.", show_alert=True)
+        await query.answer("Старый ключ нельзя продлить. Используйте новый.", show_alert=True)
         return
 
     tg_id = str(query.from_user.id)

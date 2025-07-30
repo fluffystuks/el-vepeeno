@@ -133,6 +133,21 @@ def get_all_keys(user_id: int):
         return cursor.fetchall()
 
 
+def get_active_keys_by_inbound(inbound_id: int):
+    """Return all active keys for the given inbound."""
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, user_id, email, expiry_time, client_id
+            FROM keys
+            WHERE inbound_id = ? AND active = 1
+            """,
+            (inbound_id,),
+        )
+        return cursor.fetchall()
+
+
 def cancel_pending_payment(user_id: int):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()

@@ -4,7 +4,6 @@ from db import (
     get_or_create_user,
     get_all_keys,
     get_key_by_id,
-    update_key_info,
 )
 import datetime,time
 
@@ -23,9 +22,11 @@ async def account_handler(update: Update, context: CallbackContext):
     for key in keys:
         key_id, email, expiry, active, inbound_id = key
         days_left = max(0, (expiry - int(time.time())) // 86400)
-        expiry_date = datetime.datetime.fromtimestamp(expiry).strftime('%d.%m.%Y')
-        status = "✅ Активен" if active else "❌ Не активен"
-        text = f"{email} — {days_left} дн. {status}"
+        if inbound_id == 2:
+            text = f"{email} — старый, отключится через {days_left} дн."
+        else:
+            status = "✅ Активен" if active else "❌ Не активен"
+            text = f"{email} — {days_left} дн. {status}"
 
         keyboard.append([InlineKeyboardButton(text, callback_data=f"key_{key_id}")])
 
@@ -73,15 +74,17 @@ async def show_key_handler(update: Update, context: CallbackContext):
         "Если нужна помощь — мы рядом, загляните в раздел *Помощь* 💬"
     )
     if inbound_id == 2:
-        text += "\n\n⚠️ Этот ключ использует старый сервер. Перенесите его на новый, чтобы продолжать пользоваться услугой."
+        days_left = max(0, (expiry - int(time.time())) // 86400)
+        text += f"\n\n⚠️ Старый ключ. Отключится через {days_left} дн."
 
-    keyboard = [
-        [InlineKeyboardButton("⏳ Продлить на 30 дней — 100 RUB", callback_data=f"extend_{key_id}_30")],
-        [InlineKeyboardButton("⏳ Продлить на 60 дней — 180 RUB", callback_data=f"extend_{key_id}_60")],
-        [InlineKeyboardButton("🗑 Удалить ключ", callback_data=f"delete_{key_id}")],
-    ]
     if inbound_id == 2:
-        keyboard.insert(2, [InlineKeyboardButton("🔄 Перенести", callback_data=f"migrate_{key_id}")])
+        keyboard = [[InlineKeyboardButton("🗑 Удалить ключ", callback_data=f"delete_{key_id}")]]
+    else:
+        keyboard = [
+            [InlineKeyboardButton("⏳ Продлить на 30 дней — 100 RUB", callback_data=f"extend_{key_id}_30")],
+            [InlineKeyboardButton("⏳ Продлить на 60 дней — 180 RUB", callback_data=f"extend_{key_id}_60")],
+            [InlineKeyboardButton("🗑 Удалить ключ", callback_data=f"delete_{key_id}")],
+        ]
 
     keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data="account")])
     markup = InlineKeyboardMarkup(keyboard)
@@ -140,51 +143,3 @@ async def delete_key_confirm(update: Update, context: CallbackContext):
         )
 
 
-async def migrate_key(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
-    key_id = int(query.data.split("_")[1])
-    key = get_key_by_id(key_id)
-    if not key:
-        await query.edit_message_text("Ключ не найден.")
-        return
-
-    email, _, expiry, client_id, _, inbound_id = key
-    if inbound_id != 2:
-        await query.edit_message_text("Ключ уже обновлён.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data=f"key_{key_id}")]]))
-        return
-
-    from services.delete_service import delete_client
-    from services.key_service import create_key_with_expiry
-    from db import update_key_info
-
-    result = create_key_with_expiry(expiry, inbound_id=1)
-    if not result:
-        await query.edit_message_text("❌ Не удалось создать новый ключ.")
-        return
-
-    update_key_info(key_id, result["email"], result["link"], result["client_id"], 1)
-
-    async def remove_old_client(context: CallbackContext):
-        data = context.job.data
-        delete_client(data["client_id"], inbound_id=data["inbound_id"])
-
-    context.job_queue.run_once(
-        remove_old_client,
-        when=3600,
-        data={"client_id": client_id, "inbound_id": 2},
-    )
-
-    expiry_date = datetime.datetime.fromtimestamp(expiry).strftime('%d-%m-%Y %H:%M')
-    text = (
-        "✅ *Ключ перенесён!*\n\n"
-        f"📧 *Email:* `{result['email']}`\n"
-        f"⏳ *Срок действия до:* {expiry_date}\n"
-        f"🔑 *Новый ключ:*\n`{result['link']}`"
-    )
-
-    await query.edit_message_text(
-        text,
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В меню", callback_data="account")]])
-    )
