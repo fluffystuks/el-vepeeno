@@ -48,7 +48,7 @@ def generate_client():
 def get_client_link(client_id, email):
     return f"vless://{client_id}@45.150.32.79:433?type=tcp&security=reality&pbk=eFC-ougLLf7VNPSagv1C1CHP8jBGvzVSGLmfww-9Cyg&fp=firefox&sni=www.ign.com&sid=14b4b5a9cbd5&spx=%2F&flow=xtls-rprx-vision#Buyers-{email}"
 
-def generate_key(user_id, days, inbound_id: int = 2):
+def generate_key(user_id, days, inbound_id: int = 1):
     if not session.SESSION_KEY:
         return "❌ Нет активной сессии!"
 
@@ -80,7 +80,7 @@ def generate_key(user_id, days, inbound_id: int = 2):
         return f"❌ Ошибка API: {resp.text}"
 
 
-def create_key_with_expiry(expiry_time_s: int, inbound_id: int = 2):
+def create_key_with_expiry(expiry_time_s: int, inbound_id: int = 1):
     if not session.SESSION_KEY:
         return None
 

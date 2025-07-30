@@ -2,7 +2,7 @@ import requests
 from services import session
 from config import API_URL
 
-INBOUND_ID = 2
+INBOUND_ID = 1
 
 
 def delete_client(client_id: str, inbound_id: int = INBOUND_ID) -> bool:

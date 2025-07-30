@@ -72,7 +72,7 @@ async def show_key_handler(update: Update, context: CallbackContext):
         "Просто скопируйте этот ключ и вставьте в приложение VPN.\n"
         "Если нужна помощь — мы рядом, загляните в раздел *Помощь* 💬"
     )
-    if inbound_id == 1:
+    if inbound_id == 2:
         text += "\n\n⚠️ Этот ключ использует старый сервер. Перенесите его на новый, чтобы продолжать пользоваться услугой."
 
     keyboard = [
@@ -80,7 +80,7 @@ async def show_key_handler(update: Update, context: CallbackContext):
         [InlineKeyboardButton("⏳ Продлить на 60 дней — 180 RUB", callback_data=f"extend_{key_id}_60")],
         [InlineKeyboardButton("🗑 Удалить ключ", callback_data=f"delete_{key_id}")],
     ]
-    if inbound_id == 1:
+    if inbound_id == 2:
         keyboard.insert(2, [InlineKeyboardButton("🔄 Перенести", callback_data=f"migrate_{key_id}")])
 
     keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data="account")])
@@ -150,7 +150,7 @@ async def migrate_key(update: Update, context: CallbackContext):
         return
 
     email, _, expiry, client_id, _, inbound_id = key
-    if inbound_id != 1:
+    if inbound_id != 2:
         await query.edit_message_text("Ключ уже обновлён.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data=f"key_{key_id}")]]))
         return
 
@@ -158,16 +158,16 @@ async def migrate_key(update: Update, context: CallbackContext):
     from services.key_service import create_key_with_expiry
     from db import update_key_info
 
-    if not delete_client(client_id, inbound_id=1):
+    if not delete_client(client_id, inbound_id=2):
         await query.edit_message_text("❌ Не удалось удалить старый ключ.")
         return
 
-    result = create_key_with_expiry(expiry, inbound_id=2)
+    result = create_key_with_expiry(expiry, inbound_id=1)
     if not result:
         await query.edit_message_text("❌ Не удалось создать новый ключ.")
         return
 
-    update_key_info(key_id, result["email"], result["link"], result["client_id"], 2)
+    update_key_info(key_id, result["email"], result["link"], result["client_id"], 1)
 
     await query.edit_message_text(
         "✅ Ключ перенесён на новый сервер.",

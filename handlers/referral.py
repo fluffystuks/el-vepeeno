@@ -164,10 +164,10 @@ async def apply_bonus_button(update: Update, context: CallbackContext):
         await query.edit_message_text("Ключ не найден.")
         return
     email, _, expiry, client_id, active, inbound_id = key
-    if inbound_id == 1:
+    if inbound_id == 2:
         await query.edit_message_text("Старый ключ нельзя продлить, перенесите его на новый.")
         return
-    result = extend_key(email, client_id, active, expiry, days, inbound_id=2)
+    result = extend_key(email, client_id, active, expiry, days, inbound_id=1)
     if result:
         update_key_expiry(key_id, result)
         reset_notified_level(key_id)

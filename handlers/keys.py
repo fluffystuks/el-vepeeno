@@ -57,7 +57,7 @@ async def tariff_handler(update: Update, context: CallbackContext):
             await query.answer("❌ Вы уже использовали пробный!", show_alert=True)
             return
 
-        result = generate_key(user_id, durations[choice], inbound_id=2)
+        result = generate_key(user_id, durations[choice], inbound_id=1)
         if isinstance(result, dict):
             add_key(
                 user_id,
@@ -65,7 +65,7 @@ async def tariff_handler(update: Update, context: CallbackContext):
                 result['link'],
                 result['expiry_time'] // 1000,
                 result['client_id'],
-                2,
+                1,
             )
             mark_trial_used(user_id)
 
@@ -97,7 +97,7 @@ async def tariff_handler(update: Update, context: CallbackContext):
 
         update_balance(user_id, balance - price)
 
-        result = generate_key(user_id, days, inbound_id=2)
+        result = generate_key(user_id, days, inbound_id=1)
         if isinstance(result, dict) and 'email' in result:
             add_key(
                 user_id,
@@ -105,7 +105,7 @@ async def tariff_handler(update: Update, context: CallbackContext):
                 result['link'],
                 result['expiry_time'] // 1000,
                 result['client_id'],
-                2,
+                1,
             )
 
             expiry_date = datetime.datetime.fromtimestamp(result['expiry_time'] // 1000).strftime('%d.%m.%Y')

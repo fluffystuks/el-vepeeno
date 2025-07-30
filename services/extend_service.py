@@ -6,7 +6,7 @@ from services import session
 from config import API_URL
 
 
-INBOUND_ID = 2
+INBOUND_ID = 1
 API_URL = API_URL
 
 

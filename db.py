@@ -27,7 +27,7 @@ def init_db():
                 active INTEGER DEFAULT 1,
                 client_id TEXT,
                 notified_level INTEGER DEFAULT 0,  -- 🟢 Добавлено
-                inbound_id INTEGER DEFAULT 2,
+                inbound_id INTEGER DEFAULT 1,
                 FOREIGN KEY(user_id) REFERENCES users(id)
             );
 
@@ -56,8 +56,9 @@ def init_db():
 
         try:
             cursor.execute(
-                "ALTER TABLE keys ADD COLUMN inbound_id INTEGER DEFAULT 2"
+                "ALTER TABLE keys ADD COLUMN inbound_id INTEGER DEFAULT 1"
             )
+            cursor.execute("UPDATE keys SET inbound_id = 2")
         except sqlite3.OperationalError:
             # Column already exists
             pass
@@ -187,7 +188,7 @@ def update_balance(user_id: int, new_balance: float):
         cursor.execute("UPDATE users SET balance = ? WHERE id = ?", (new_balance, user_id))
         conn.commit()
 
-def add_key(user_id, email, link, expiry_time, client_id, inbound_id=2):
+def add_key(user_id, email, link, expiry_time, client_id, inbound_id=1):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
         cursor.execute(
