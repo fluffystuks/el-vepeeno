@@ -1,28 +1,28 @@
 import requests, json
 from datetime import datetime
 import services.key_service
-from services.key_service import SESSION_KEY  
+from services.key_service import SESSION_KEY
 from services import session
 from config import API_URL
 
 
-INBOUND_ID = 2 
+INBOUND_ID = 2
 API_URL = API_URL
-def extend_key(email, client_id, active, current_expiry_ms, add_days):
+
+def extend_key(email, client_id, active, current_expiry, add_days):
     if not session.SESSION_KEY:
         print("❌ SESSION_KEY пустой!")
         return False
 
     now_ms = int(datetime.utcnow().timestamp() * 1000)
-
-    now_ms = int(datetime.utcnow().timestamp() * 1000)
+    current_expiry_ms = int(current_expiry) * 1000
 
     if current_expiry_ms > now_ms:
         base_time = current_expiry_ms
     else:
         base_time = now_ms
 
-    new_expiry = base_time + add_days * 24 * 60 * 60 * 1000
+    new_expiry_ms = base_time + add_days * 24 * 60 * 60 * 1000
 
     client_payload = {
         "id": client_id,
@@ -30,7 +30,7 @@ def extend_key(email, client_id, active, current_expiry_ms, add_days):
         "email": email,
         "limitIp": 0,
         "totalGB": 0,
-        "expiryTime": new_expiry,
+        "expiryTime": new_expiry_ms,
         "enable": True,
         "tgId": "",
         "subId": "",
@@ -58,7 +58,7 @@ def extend_key(email, client_id, active, current_expiry_ms, add_days):
             print(f"❌ Ответ не JSON: {resp.text!r}")
             return False
         if data.get("success"):
-            return new_expiry  
+            return new_expiry_ms // 1000
         else:
             print(f"❌ API success=false: {data}")
             return False

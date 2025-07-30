@@ -16,9 +16,9 @@ async def account_handler(update: Update, context: CallbackContext):
     keyboard = []
 
     for key in keys:
-        key_id, email, expiry_ms, active = key
-        days_left = max(0, (expiry_ms // 1000 - int(time.time())) // 86400)
-        expiry_date = datetime.datetime.fromtimestamp(expiry_ms // 1000).strftime('%d.%m.%Y')
+        key_id, email, expiry, active = key
+        days_left = max(0, (expiry - int(time.time())) // 86400)
+        expiry_date = datetime.datetime.fromtimestamp(expiry).strftime('%d.%m.%Y')
         status = "✅ Активен" if active else "❌ Не активен"
         text = f"{email} — {days_left} дн. {status}"
 
@@ -55,9 +55,9 @@ async def show_key_handler(update: Update, context: CallbackContext):
         await query.answer("Ключ не найден.", show_alert=True)
         return
 
-    email, link, expiry_ms, client_id, *_ = key
+    email, link, expiry, client_id, *_ = key
 
-    expiry_date = datetime.datetime.fromtimestamp(expiry_ms // 1000).strftime('%d-%m-%Y %H:%M')
+    expiry_date = datetime.datetime.fromtimestamp(expiry).strftime('%d-%m-%Y %H:%M')
 
     text = (
         "👤 *Детали ключа*\n\n"
