@@ -18,7 +18,11 @@ async def extend_key_handler(update, context):
         await query.answer("❌ Ключ не найден!", show_alert=True)
         return
 
-    email, link, expiry, client_id, active = key
+    email, link, expiry, client_id, active, inbound_id = key
+
+    if inbound_id == 1:
+        await query.answer("Ключ устарел. Перенесите его на новый сервер.", show_alert=True)
+        return
 
     tg_id = str(query.from_user.id)
     user_id, balance = get_or_create_user(tg_id)
@@ -34,6 +38,7 @@ async def extend_key_handler(update, context):
         active=active,
         current_expiry=expiry,
         add_days=add_days,
+        inbound_id=2,
     )
 
     if result:

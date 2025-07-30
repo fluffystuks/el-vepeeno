@@ -9,7 +9,8 @@ from config import API_URL
 INBOUND_ID = 2
 API_URL = API_URL
 
-def extend_key(email, client_id, active, current_expiry, add_days):
+
+def extend_key(email, client_id, active, current_expiry, add_days, inbound_id: int = INBOUND_ID):
     if not session.SESSION_KEY:
         print("❌ SESSION_KEY пустой!")
         return False
@@ -38,7 +39,7 @@ def extend_key(email, client_id, active, current_expiry, add_days):
     }
 
     payload = {
-        "id": INBOUND_ID,
+        "id": inbound_id,
         "settings": json.dumps({"clients": [client_payload]})
     }
 
