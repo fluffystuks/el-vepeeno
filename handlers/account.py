@@ -158,10 +158,6 @@ async def migrate_key(update: Update, context: CallbackContext):
     from services.key_service import create_key_with_expiry
     from db import update_key_info
 
-    if not delete_client(client_id, inbound_id=2):
-        await query.edit_message_text("❌ Не удалось удалить старый ключ.")
-        return
-
     result = create_key_with_expiry(expiry, inbound_id=1)
     if not result:
         await query.edit_message_text("❌ Не удалось создать новый ключ.")
@@ -169,7 +165,26 @@ async def migrate_key(update: Update, context: CallbackContext):
 
     update_key_info(key_id, result["email"], result["link"], result["client_id"], 1)
 
+    async def remove_old_client(context: CallbackContext):
+        data = context.job.data
+        delete_client(data["client_id"], inbound_id=data["inbound_id"])
+
+    context.job_queue.run_once(
+        remove_old_client,
+        when=3600,
+        data={"client_id": client_id, "inbound_id": 2},
+    )
+
+    expiry_date = datetime.datetime.fromtimestamp(expiry).strftime('%d-%m-%Y %H:%M')
+    text = (
+        "✅ *Ключ перенесён!*\n\n"
+        f"📧 *Email:* `{result['email']}`\n"
+        f"⏳ *Срок действия до:* {expiry_date}\n"
+        f"🔑 *Новый ключ:*\n`{result['link']}`"
+    )
+
     await query.edit_message_text(
-        "✅ Ключ перенесён на новый сервер.",
+        text,
+        parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В меню", callback_data="account")]])
     )
