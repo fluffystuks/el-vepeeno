@@ -237,26 +237,30 @@ def reset_notification_flag(key_id: int):
 def get_expiring_keys():
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
-        now = int(time.time() * 1000)
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT keys.id, keys.user_id, keys.email, keys.expiry_time, users.tg_id, keys.notified_level
             FROM keys
             JOIN users ON keys.user_id = users.id
             WHERE keys.active = 1
-        """)
+        """
+        )
         keys = []
+        now = int(time.time())
         for row in cursor.fetchall():
-            key_id, user_id, email, expiry_ms, tg_id, notified_level = row
-            remaining = (expiry_ms // 1000) - int(time.time())
-            keys.append({
-                "key_id": key_id,
-                "user_id": user_id,
-                "tg_id": tg_id,
-                "email": email,
-                "expiry_time": expiry_ms,
-                "remaining_seconds": remaining,
-                "notified_level": notified_level
-            })
+            key_id, user_id, email, expiry, tg_id, notified_level = row
+            remaining = expiry - now
+            keys.append(
+                {
+                    "key_id": key_id,
+                    "user_id": user_id,
+                    "tg_id": tg_id,
+                    "email": email,
+                    "expiry_time": expiry,
+                    "remaining_seconds": remaining,
+                    "notified_level": notified_level,
+                }
+            )
         return keys
     
 def deactivate_key(key_id):

@@ -63,8 +63,8 @@ async def tariff_handler(update: Update, context: CallbackContext):
                 user_id,
                 result['email'],
                 result['link'],
-                result['expiry_time'],
-                result['client_id']
+                result['expiry_time'] // 1000,
+                result['client_id'],
             )
             mark_trial_used(user_id)
 
@@ -102,8 +102,8 @@ async def tariff_handler(update: Update, context: CallbackContext):
                 user_id,
                 result['email'],
                 result['link'],
-                result['expiry_time'],
-                result['client_id']
+                result['expiry_time'] // 1000,
+                result['client_id'],
             )
 
             expiry_date = datetime.datetime.fromtimestamp(result['expiry_time'] // 1000).strftime('%d.%m.%Y')
