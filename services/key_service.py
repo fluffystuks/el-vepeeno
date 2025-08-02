@@ -1,14 +1,13 @@
 import requests
-import uuid
 import random
 import string
-import json  
+import json
 from datetime import datetime, timedelta
-from db import add_key
 from services import session
 from config import API_URL, USERNAME, PASSWORD
 
 SESSION_KEY = None
+FLOW = "xtls-rprx-vision"
 
 def login():
     resp = requests.post(
@@ -34,7 +33,7 @@ def generate_client():
     in_email_id = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ', k=6))
     return {
         "id": f"Pieno_{in_email_id}",
-        "flow": "xtls-rprx-vision",
+        "flow": FLOW,
         "email": f"🇩🇪 Германия ({in_email_id})",
         "limitIp": 3,
         "totalGB": 0,
@@ -46,7 +45,11 @@ def generate_client():
     }
 
 def get_client_link(client_id, email):
-    return f"vless://{client_id}@45.150.32.79:433?type=tcp&security=reality&pbk=eFC-ougLLf7VNPSagv1C1CHP8jBGvzVSGLmfww-9Cyg&fp=firefox&sni=www.ign.com&sid=14b4b5a9cbd5&spx=%2F&flow=xtls-rprx-vision#Buyers-{email}"
+    return (
+        f"vless://{client_id}@45.150.32.79:433?type=tcp&security=reality&pbk="
+        f"eFC-ougLLf7VNPSagv1C1CHP8jBGvzVSGLmfww-9Cyg&fp=firefox&"
+        f"sni=www.ign.com&sid=14b4b5a9cbd5&spx=%2F&flow={FLOW}#Buyers-{email}"
+    )
 
 NEW_INBOUND_ID = 1
 
@@ -55,10 +58,11 @@ def generate_key(user_id, days, inbound_id: int = NEW_INBOUND_ID):
         return "❌ Нет активной сессии!"
 
     client = generate_client()
-    client_id = client['id']  
+    client_id = client['id']
+    client['flow'] = FLOW
 
     expiry = int((datetime.utcnow() + timedelta(days=days)).timestamp() * 1000)
-    expiry += 3 * 60 * 60 * 1000  
+    expiry += 3 * 60 * 60 * 1000
     client['expiryTime'] = expiry
 
     payload = {"id": inbound_id, "settings": json.dumps({"clients": [client]})}
@@ -85,6 +89,7 @@ def create_key_with_expiry(expiry_ms: int, inbound_id: int = NEW_INBOUND_ID):
 
     client = generate_client()
     client_id = client["id"]
+    client["flow"] = FLOW
     client["expiryTime"] = expiry_ms
 
     payload = {"id": inbound_id, "settings": json.dumps({"clients": [client]})}
