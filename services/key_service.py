@@ -30,7 +30,7 @@ def login():
 def generate_random_string(length=6):
     return ''.join(random.choices(string.ascii_uppercase, k=length))
 
-def generate_client():
+def generate_client(tg_id: str):
     in_email_id = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ', k=6))
     return {
         "id": f"Pieno_{in_email_id}",
@@ -40,7 +40,7 @@ def generate_client():
         "totalGB": 0,
         "expiryTime": 0,
         "enable": True,
-        "tgId": "",
+        "tgId": str(tg_id),
         "subId": ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=12)),
         "reset": 0
     }
@@ -48,11 +48,11 @@ def generate_client():
 def get_client_link(client_id, email):
     return f"vless://{client_id}@45.150.32.79:443?type=tcp&security=reality&pbk=_Al8Epi5BZ5Jj2HmPd5dLoiS_gim1viw0LNbE9DztXc&fp=chrome&sni=github.com&sid=ffffffffff&spx=%2F&flow=xtls-rprx-vision#{email}"
 
-def generate_key(user_id, days, inbound_id: int = 1):
+def generate_key(user_id, days, tg_id, inbound_id: int = 1):
     if not session.SESSION_KEY:
         return "❌ Нет активной сессии!"
 
-    client = generate_client()
+    client = generate_client(tg_id)
     client_id = client['id']  
 
     expiry = int((datetime.utcnow() + timedelta(days=days)).timestamp() * 1000)
@@ -79,11 +79,11 @@ def generate_key(user_id, days, inbound_id: int = 1):
         return f"❌ Ошибка API: {resp.text}"
 
 
-def create_key_with_expiry(expiry_time_s: int, inbound_id: int = 1):
+def create_key_with_expiry(expiry_time_s: int, tg_id, inbound_id: int = 1):
     if not session.SESSION_KEY:
         return None
 
-    client = generate_client()
+    client = generate_client(tg_id)
     client_id = client["id"]
     client["flow"] = "xtls-rprx-vision"
     client["limitIp"] = "2"
