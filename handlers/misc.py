@@ -3,6 +3,7 @@ from telegram.ext import CallbackContext
 
 async def instruction_handler(update: Update, context: CallbackContext):
     await update.callback_query.answer()
+    tg_id = str(update.effective_user.id)
     keyboard = [[InlineKeyboardButton("🔙 Вернуться в меню", callback_data='back')]]
     markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
@@ -35,12 +36,14 @@ async def rules_handler(update: Update, context: CallbackContext):
 
 async def help_handler(update: Update, context: CallbackContext):
     await update.callback_query.answer()
+    tg_id = str(update.effective_user.id)
     keyboard = [[InlineKeyboardButton("🔙 Вернуться в меню", callback_data='back')]]
     markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
         "🤝 *Раздел поддержки*\n\n"
         "Если у вас возникли вопросы или требуется помощь, вы можете напрямую связаться с администратором.\n\n"
-        "📲 [Написать администратору](https://t.me/othrwise)",
+        "📲 [Написать администратору](https://t.me/othrwise)\n"
+        f"Ваш TG ID: `{tg_id}`",
         parse_mode="Markdown",
         reply_markup=markup
     )

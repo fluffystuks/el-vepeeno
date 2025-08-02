@@ -29,14 +29,13 @@ async def connect_handler(update: Update, context: CallbackContext):
     ]
 
     markup = InlineKeyboardMarkup(keyboard)
-
+    tg_id = str(query.from_user.id)
+    balance = int(get_or_create_user(tg_id)[1])
     await query.edit_message_text(
-        "💡 *Выберите тариф подключения:*\n\n"
-        "Все ключи работают сразу после покупки.\n",
-        parse_mode="Markdown",
-        reply_markup=markup
+    "💡 *Выберите тариф подключения:*\n\n"
+    f"💰 *Ваш баланс:* *{balance} RUB*\n\n"
+    "Все ключи активируются сразу после покупки и готовы к использованию."
     )
-
 async def tariff_handler(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()

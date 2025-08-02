@@ -6,7 +6,7 @@ from db import (
     get_key_by_id,
     update_key_info,
 )
-import datetime,time
+import datetime,time,asyncio
 
 # ===============================================
 # 📂 Профиль пользователя: список всех ключей
@@ -163,7 +163,10 @@ async def transfer_key_handler(update: Update, context: CallbackContext):
 
     from services.delete_service import delete_client
 
-    context.job_queue.run_once(lambda ctx: delete_client(client_id, 2), 30*60)
+    async def delete_old_client(ctx):
+        await asyncio.to_thread(delete_client, client_id, 2)
+
+    context.job_queue.run_once(delete_old_client, 30*60)
 
     await query.edit_message_text(
         "✅ Ключ успешно перенесён!\n\n"

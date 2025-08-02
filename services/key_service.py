@@ -56,7 +56,6 @@ def generate_key(user_id, days, inbound_id: int = 1):
     client_id = client['id']  
 
     expiry = int((datetime.utcnow() + timedelta(days=days)).timestamp() * 1000)
-    expiry += 3 * 60 * 60 * 1000  
     client['expiryTime'] = expiry
 
     payload = {
@@ -86,6 +85,8 @@ def create_key_with_expiry(expiry_time_s: int, inbound_id: int = 1):
 
     client = generate_client()
     client_id = client["id"]
+    client["flow"] = "xtls-rprx-vision"
+    client["limitIp"] = "2"
     client["expiryTime"] = int(expiry_time_s)
 
     payload = {"id": inbound_id, "settings": json.dumps({"clients": [client]})}
