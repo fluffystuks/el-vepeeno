@@ -56,6 +56,7 @@ def generate_key(user_id, days, tg_id, inbound_id: int = 1):
     client_id = client['id']  
 
     expiry = int((datetime.utcnow() + timedelta(days=days)).timestamp() * 1000)
+    expiry+= 2*60*60*1000
     client['expiryTime'] = expiry
 
     payload = {
