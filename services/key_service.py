@@ -48,7 +48,9 @@ def generate_client():
 def get_client_link(client_id, email):
     return f"vless://{client_id}@45.150.32.79:433?type=tcp&security=reality&pbk=eFC-ougLLf7VNPSagv1C1CHP8jBGvzVSGLmfww-9Cyg&fp=firefox&sni=www.ign.com&sid=14b4b5a9cbd5&spx=%2F&flow=xtls-rprx-vision#Buyers-{email}"
 
-def generate_key(user_id, days):
+NEW_INBOUND_ID = 1
+
+def generate_key(user_id, days, inbound_id: int = NEW_INBOUND_ID):
     if not session.SESSION_KEY:
         return "❌ Нет активной сессии!"
 
@@ -59,10 +61,7 @@ def generate_key(user_id, days):
     expiry += 3 * 60 * 60 * 1000  
     client['expiryTime'] = expiry
 
-    payload = {
-        "id": 2,  
-        "settings": json.dumps({"clients": [client]})
-    }
+    payload = {"id": inbound_id, "settings": json.dumps({"clients": [client]})}
 
     headers = {"Cookie": f"3x-ui={session.SESSION_KEY}"}
     resp = requests.post(f"{API_URL}/panel/api/inbounds/addClient", json=payload, headers=headers)
@@ -78,3 +77,22 @@ def generate_key(user_id, days):
         }
     else:
         return f"❌ Ошибка API: {resp.text}"
+
+
+def create_key_with_expiry(expiry_ms: int, inbound_id: int = NEW_INBOUND_ID):
+    if not session.SESSION_KEY:
+        return None
+
+    client = generate_client()
+    client_id = client["id"]
+    client["expiryTime"] = expiry_ms
+
+    payload = {"id": inbound_id, "settings": json.dumps({"clients": [client]})}
+    headers = {"Cookie": f"3x-ui={session.SESSION_KEY}"}
+    resp = requests.post(f"{API_URL}/panel/api/inbounds/addClient", json=payload, headers=headers)
+
+    if resp.status_code == 200 and resp.json().get("success"):
+        link = get_client_link(client_id, client["email"])
+        return {"email": client["email"], "link": link, "client_id": client_id}
+    return None
+

@@ -133,7 +133,7 @@ async def choose_bonus_key(update: Update, context: CallbackContext):
         await query.edit_message_text("У вас нет ключей.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data="show_bonuses")]]))
         return
     keyboard = []
-    for key_id, email, expiry, active in keys:
+    for key_id, email, expiry, active, _ in keys:
         days_left = max(0, (expiry - int(time.time())) // 86400)
         status = "✅ Активен" if active else "❌ Не активен"
         text = f"{email} — {days_left} дн. {status}"
@@ -163,8 +163,11 @@ async def apply_bonus_button(update: Update, context: CallbackContext):
     if not key:
         await query.edit_message_text("Ключ не найден.")
         return
-    email, _, expiry, client_id, active = key
-    result = extend_key(email, client_id, active, expiry, days)
+    email, _, expiry, client_id, active, inbound_id = key
+    if inbound_id == 2:
+        await query.edit_message_text("Этот ключ нельзя продлить бонусами. Перенесите его на новую систему.")
+        return
+    result = extend_key(email, client_id, active, expiry, days, inbound_id=1)
     if result:
         update_key_expiry(key_id, result)
         reset_notified_level(key_id)

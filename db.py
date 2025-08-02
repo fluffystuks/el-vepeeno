@@ -26,7 +26,8 @@ def init_db():
                 created_at INTEGER,
                 active INTEGER DEFAULT 1,
                 client_id TEXT,
-                notified_level INTEGER DEFAULT 0,  -- 🟢 Добавлено
+                inbound_id INTEGER DEFAULT 2,
+                notified_level INTEGER DEFAULT 0,
                 FOREIGN KEY(user_id) REFERENCES users(id)
             );
 
@@ -52,15 +53,23 @@ def init_db():
             );
         """)
         conn.commit()
+        cursor.execute("PRAGMA table_info(keys)")
+        cols = [row[1] for row in cursor.fetchall()]
+        if "inbound_id" not in cols:
+            cursor.execute("ALTER TABLE keys ADD COLUMN inbound_id INTEGER DEFAULT 2")
+            conn.commit()
 
 
 def get_key_by_id(key_id: int):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT email, key_link, expiry_time, client_id, active
+        cursor.execute(
+            """
+            SELECT email, key_link, expiry_time, client_id, active, inbound_id
             FROM keys WHERE id = ?
-        """, (key_id,))
+            """,
+            (key_id,),
+        )
         return cursor.fetchone()
 
 def update_notified_level(key_id: int, level: int):
@@ -76,6 +85,19 @@ def update_key_expiry(key_id: int, new_expiry: int):
         cursor.execute("""
             UPDATE keys SET expiry_time = ? WHERE id = ?
         """, (new_expiry, key_id))
+        conn.commit()
+
+def update_key_info(key_id: int, email: str, link: str, client_id: str, inbound_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE keys
+            SET email = ?, key_link = ?, client_id = ?, inbound_id = ?
+            WHERE id = ?
+            """,
+            (email, link, client_id, inbound_id, key_id),
+        )
         conn.commit()
 
 def reset_notified_level(key_id: int):
@@ -96,10 +118,13 @@ def activate_key(key_id: int):
 def get_all_keys(user_id: int):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, email, expiry_time, active FROM keys
+        cursor.execute(
+            """
+            SELECT id, email, expiry_time, active, inbound_id FROM keys
             WHERE user_id = ?
-        """, (user_id,))
+            """,
+            (user_id,),
+        )
         return cursor.fetchall()
 
 
@@ -158,13 +183,13 @@ def update_balance(user_id: int, new_balance: float):
         cursor.execute("UPDATE users SET balance = ? WHERE id = ?", (new_balance, user_id))
         conn.commit()
 
-def add_key(user_id, email, link, expiry_time, client_id):
+def add_key(user_id, email, link, expiry_time, client_id, inbound_id=1):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO keys (user_id, email, key_link, expiry_time, created_at, active, client_id)
-            VALUES (?, ?, ?, ?, strftime('%s','now'), 1, ?)
-        """, (user_id, email, link, expiry_time, client_id))
+            INSERT INTO keys (user_id, email, key_link, expiry_time, created_at, active, client_id, inbound_id)
+            VALUES (?, ?, ?, ?, strftime('%s','now'), 1, ?, ?)
+        """, (user_id, email, link, expiry_time, client_id, inbound_id))
         conn.commit()
 
 def save_payment(user_id: int, payment_id: str, amount: float):

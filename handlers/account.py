@@ -1,6 +1,11 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
-from db import get_or_create_user, get_all_keys, get_key_by_id
+from db import (
+    get_or_create_user,
+    get_all_keys,
+    get_key_by_id,
+    update_key_info,
+)
 import datetime,time
 
 # ===============================================
@@ -16,7 +21,7 @@ async def account_handler(update: Update, context: CallbackContext):
     keyboard = []
 
     for key in keys:
-        key_id, email, expiry, active = key
+        key_id, email, expiry, active, _ = key
         days_left = max(0, (expiry - int(time.time())) // 86400)
         expiry_date = datetime.datetime.fromtimestamp(expiry).strftime('%d.%m.%Y')
         status = "✅ Активен" if active else "❌ Не активен"
@@ -55,7 +60,7 @@ async def show_key_handler(update: Update, context: CallbackContext):
         await query.answer("Ключ не найден.", show_alert=True)
         return
 
-    email, link, expiry, client_id, *_ = key
+    email, link, expiry, client_id, active, inbound_id = key
 
     expiry_date = datetime.datetime.fromtimestamp(expiry).strftime('%d-%m-%Y %H:%M')
 
@@ -68,12 +73,17 @@ async def show_key_handler(update: Update, context: CallbackContext):
         "Если нужна помощь — мы рядом, загляните в раздел *Помощь* 💬"
     )
 
-    keyboard = [
-        [InlineKeyboardButton("⏳ Продлить на 30 дней — 100 RUB", callback_data=f"extend_{key_id}_30")],
-        [InlineKeyboardButton("⏳ Продлить на 60 дней — 180 RUB", callback_data=f"extend_{key_id}_60")],
-        [InlineKeyboardButton("🗑 Удалить ключ", callback_data=f"delete_{key_id}")],
-        [InlineKeyboardButton("🔙 Назад", callback_data="account")]
-    ]
+    if inbound_id == 2:
+        keyboard = [[InlineKeyboardButton("🔄 Перенести", callback_data=f"transfer_{key_id}")],
+                   [InlineKeyboardButton("🔙 Назад", callback_data="account")]]
+        text += "\n\nЭтот ключ нельзя продлить. Перенесите его на новую систему."
+    else:
+        keyboard = [
+            [InlineKeyboardButton("⏳ Продлить на 30 дней — 100 RUB", callback_data=f"extend_{key_id}_30")],
+            [InlineKeyboardButton("⏳ Продлить на 60 дней — 180 RUB", callback_data=f"extend_{key_id}_60")],
+            [InlineKeyboardButton("🗑 Удалить ключ", callback_data=f"delete_{key_id}")],
+            [InlineKeyboardButton("🔙 Назад", callback_data="account")]
+        ]
     markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
@@ -109,11 +119,11 @@ async def delete_key_confirm(update: Update, context: CallbackContext):
         await query.edit_message_text("Ключ не найден.")
         return
 
-    _, _, _, client_id, _ = key
+    _, _, _, client_id, _, inbound_id = key
     from services.delete_service import delete_client
     from db import delete_key as db_delete
 
-    if delete_client(client_id):
+    if delete_client(client_id, inbound_id):
         db_delete(key_id)
         await query.edit_message_text(
             "✅ Ключ удалён.",
@@ -128,3 +138,36 @@ async def delete_key_confirm(update: Update, context: CallbackContext):
                 [[InlineKeyboardButton("🔙 Назад", callback_data=f"key_{key_id}")]]
             ),
         )
+
+
+async def transfer_key_handler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    key_id = int(query.data.split("_")[1])
+    record = get_key_by_id(key_id)
+    if not record:
+        await query.answer("Ключ не найден.", show_alert=True)
+        return
+    email, link, expiry, client_id, active, inbound_id = record
+    if inbound_id != 2:
+        await query.answer("Ключ уже перенесён.", show_alert=True)
+        return
+
+    from services.key_service import create_key_with_expiry
+    result = create_key_with_expiry(expiry * 1000, inbound_id=1)
+    if not isinstance(result, dict):
+        await query.answer("❌ Не удалось перенести ключ.", show_alert=True)
+        return
+
+    update_key_info(key_id, result["email"], result["link"], result["client_id"], 1)
+
+    from services.delete_service import delete_client
+
+    context.job_queue.run_once(lambda ctx: delete_client(client_id, 2), 30 * 60)
+
+    await query.edit_message_text(
+        "✅ Ключ перенесён. Старый будет удалён через 30 минут.\n\n"
+        f"🔑 Новый ключ:\n`{result['link']}`",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В меню", callback_data="account")]]),
+    )
