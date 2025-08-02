@@ -56,7 +56,7 @@ async def tariff_handler(update: Update, context: CallbackContext):
             await query.answer("❌ Вы уже использовали пробный!", show_alert=True)
             return
 
-        result = generate_key(user_id, durations[choice])
+        result = generate_key(user_id, durations[choice], tg_id)
         if isinstance(result, dict):
             add_key(
                 user_id,
@@ -96,7 +96,7 @@ async def tariff_handler(update: Update, context: CallbackContext):
 
         update_balance(user_id, balance - price)
 
-        result = generate_key(user_id, days)
+        result = generate_key(user_id, days, tg_id)
         if isinstance(result, dict) and 'email' in result:
             add_key(
                 user_id,

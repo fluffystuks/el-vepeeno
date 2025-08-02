@@ -154,7 +154,8 @@ async def transfer_key_handler(update: Update, context: CallbackContext):
         return
 
     from services.key_service import create_key_with_expiry
-    result = create_key_with_expiry(expiry * 1000, inbound_id=1)
+    tg_id = str(query.from_user.id)
+    result = create_key_with_expiry(expiry * 1000, tg_id, inbound_id=1)
     if not isinstance(result, dict):
         await query.answer("❌ Не удалось перенести ключ.", show_alert=True)
         return
