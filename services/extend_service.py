@@ -6,10 +6,10 @@ from services import session
 from config import API_URL
 
 
-INBOUND_ID = 2
+DEFAULT_INBOUND_ID = 1
 API_URL = API_URL
 
-def extend_key(email, client_id, active, current_expiry, add_days):
+def extend_key(email, client_id, active, current_expiry, add_days, inbound_id: int = DEFAULT_INBOUND_ID):
     if not session.SESSION_KEY:
         print("❌ SESSION_KEY пустой!")
         return False
@@ -37,10 +37,7 @@ def extend_key(email, client_id, active, current_expiry, add_days):
         "reset": 0
     }
 
-    payload = {
-        "id": INBOUND_ID,
-        "settings": json.dumps({"clients": [client_payload]})
-    }
+    payload = {"id": inbound_id, "settings": json.dumps({"clients": [client_payload]})}
 
     url = f"{API_URL}/panel/api/inbounds/updateClient/{client_id}"
 

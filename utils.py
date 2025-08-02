@@ -19,7 +19,7 @@ async def refresh_session_key_once(context: CallbackContext) -> None:
     print("🔑 Пробуем обновить SESSION_KEY...")
     await notify_admin(bot, "🔑 Пробуем обновить SESSION_KEY...")
 
-    success = login()
+    success = await asyncio.to_thread(login)
 
     if success:
         msg = "✅ SESSION_KEY обновлён!"

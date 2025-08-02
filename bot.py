@@ -6,6 +6,10 @@ warnings.filterwarnings(
     message=r".*CallbackQueryHandler.*",
     category=PTBUserWarning
 )
+import logging
+logging.getLogger("telegram").setLevel(logging.WARNING)
+logging.getLogger("telegram.ext").setLevel(logging.WARNING)
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -31,6 +35,7 @@ from handlers.account import (
     show_key_handler,
     delete_key_prompt,
     delete_key_confirm,
+    transfer_key_handler,
 )
 from handlers.extend import extend_key_handler
 from handlers.misc import help_handler, instruction_handler, rules_handler
@@ -103,6 +108,7 @@ def main():
     application.add_handler(CallbackQueryHandler(rules_handler, pattern="^rules$"))
     application.add_handler(CallbackQueryHandler(extend_key_handler, pattern="^extend_"))
     application.add_handler(CallbackQueryHandler(show_key_handler, pattern="^key_"))
+    application.add_handler(CallbackQueryHandler(transfer_key_handler, pattern="^transfer_"))
     application.add_handler(CallbackQueryHandler(delete_key_prompt, pattern="^delete_"))
     application.add_handler(CallbackQueryHandler(delete_key_confirm, pattern="^confirm_delete_"))
     application.add_handler(CallbackQueryHandler(check_payment_handler, pattern="^check_payment$"))

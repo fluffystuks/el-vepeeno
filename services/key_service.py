@@ -36,7 +36,7 @@ def generate_client():
         "id": f"Pieno_{in_email_id}",
         "flow": "xtls-rprx-vision",
         "email": f"🇩🇪 Германия ({in_email_id})",
-        "limitIp": 3,
+        "limitIp": 2,
         "totalGB": 0,
         "expiryTime": 0,
         "enable": True,
@@ -46,9 +46,9 @@ def generate_client():
     }
 
 def get_client_link(client_id, email):
-    return f"vless://{client_id}@45.150.32.79:433?type=tcp&security=reality&pbk=eFC-ougLLf7VNPSagv1C1CHP8jBGvzVSGLmfww-9Cyg&fp=firefox&sni=www.ign.com&sid=14b4b5a9cbd5&spx=%2F&flow=xtls-rprx-vision#Buyers-{email}"
+    return f"vless://{client_id}@45.150.32.79:443?type=tcp&security=reality&pbk=_Al8Epi5BZ5Jj2HmPd5dLoiS_gim1viw0LNbE9DztXc&fp=chrome&sni=github.com&sid=ffffffffff&spx=%2F&flow=xtls-rprx-vision#{email}"
 
-def generate_key(user_id, days):
+def generate_key(user_id, days, inbound_id: int = 1):
     if not session.SESSION_KEY:
         return "❌ Нет активной сессии!"
 
@@ -60,7 +60,7 @@ def generate_key(user_id, days):
     client['expiryTime'] = expiry
 
     payload = {
-        "id": 2,  
+        "id": inbound_id,
         "settings": json.dumps({"clients": [client]})
     }
 
@@ -78,3 +78,25 @@ def generate_key(user_id, days):
         }
     else:
         return f"❌ Ошибка API: {resp.text}"
+
+
+def create_key_with_expiry(expiry_time_s: int, inbound_id: int = 1):
+    if not session.SESSION_KEY:
+        return None
+
+    client = generate_client()
+    client_id = client["id"]
+    client["expiryTime"] = int(expiry_time_s)
+
+    payload = {"id": inbound_id, "settings": json.dumps({"clients": [client]})}
+
+    headers = {"Cookie": f"3x-ui={session.SESSION_KEY}"}
+    resp = requests.post(f"{API_URL}/panel/api/inbounds/addClient", json=payload, headers=headers)
+    if resp.status_code == 200 and resp.json().get("success"):
+        link = get_client_link(client_id, client["email"])
+        return {
+            "email": client["email"],
+            "link": link,
+            "client_id": client_id,
+        }
+    return None
