@@ -34,7 +34,9 @@ async def connect_handler(update: Update, context: CallbackContext):
     await query.edit_message_text(
     "💡 *Выберите тариф подключения:*\n\n"
     f"💰 *Ваш баланс:* *{balance} RUB*\n\n"
-    "Все ключи активируются сразу после покупки и готовы к использованию."
+    "Все ключи активируются сразу после покупки и готовы к использованию.",
+    parse_mode='Markdown',
+    reply_markup=markup
     )
 async def tariff_handler(update: Update, context: CallbackContext):
     query = update.callback_query
