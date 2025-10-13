@@ -171,6 +171,28 @@ def get_user_tg(user_id: int) -> str:
         row = cursor.fetchone()
         return row[0] if row else None
 
+
+def get_all_user_tg_ids():
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT tg_id FROM users WHERE tg_id IS NOT NULL")
+        return [row[0] for row in cursor.fetchall()]
+
+
+def get_active_users_tg_ids():
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT DISTINCT users.tg_id
+            FROM users
+            JOIN keys ON keys.user_id = users.id
+            WHERE keys.active = 1 AND users.tg_id IS NOT NULL
+        """
+        )
+        return [row[0] for row in cursor.fetchall()]
+
+
 def mark_notified(key_id: int):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()

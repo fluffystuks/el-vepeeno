@@ -46,6 +46,15 @@ from handlers.referral import (
     choose_bonus_key,
     apply_bonus_button,
 )
+from handlers.admin import (
+    admin_panel,
+    admin_choose_audience,
+    admin_broadcast_message,
+    admin_cancel,
+    admin_cancel_callback,
+    SELECT_ACTION,
+    WAITING_MESSAGE,
+)
 from services.key_service import login
 from scheduler import start_scheduler
 
@@ -74,6 +83,22 @@ payment_conv_handler = ConversationHandler(
 )
 
 
+admin_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("admin", admin_panel)],
+    states={
+        SELECT_ACTION: [
+            CallbackQueryHandler(admin_choose_audience, pattern="^admin_broadcast_(all|active)$"),
+            CallbackQueryHandler(admin_cancel_callback, pattern="^admin_cancel$"),
+        ],
+        WAITING_MESSAGE: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, admin_broadcast_message)
+        ],
+    },
+    fallbacks=[CommandHandler("cancel", admin_cancel)],
+    per_message=False,
+)
+
+
 async def post_init(application):
     await start_scheduler(application)
 
@@ -99,6 +124,7 @@ def main():
 
     
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(admin_conv_handler)
     application.add_handler(CommandHandler("bonuses", list_bonuses))
     application.add_handler(payment_conv_handler)
     application.add_handler(CommandHandler("check_payment", check_payment_handler))
