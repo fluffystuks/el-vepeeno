@@ -26,7 +26,7 @@ def extend_key(email, client_id, active, current_expiry, add_days, inbound_id: i
 
     client_payload = {
         "id": client_id,
-        "flow": "",
+        "flow": "xtls-rprx-vision",
         "email": email,
         "limitIp": 0,
         "totalGB": 0,
