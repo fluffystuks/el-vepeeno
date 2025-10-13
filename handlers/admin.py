@@ -1,3 +1,4 @@
+import asyncio
 from typing import List
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -49,13 +50,11 @@ async def admin_fix_sni(update: Update, context: CallbackContext) -> int:
     await query.answer()
     await query.edit_message_text("🔄 Запускаю обновление ссылок и продление ключей. Подождите...")
 
-    loop = context.application.loop
     try:
         from services.maintenance import replace_sni_and_grant_bonus
 
-        metrics = await loop.run_in_executor(
-            None,
-            lambda: replace_sni_and_grant_bonus("github.com", "yandex.net", 3),
+        metrics = await asyncio.to_thread(
+            replace_sni_and_grant_bonus, "github.com", "yandex.net", 3
         )
     except Exception as exc:
         await query.edit_message_text(f"❌ Не удалось выполнить операцию: {exc}")
