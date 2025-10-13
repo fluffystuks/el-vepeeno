@@ -46,7 +46,7 @@ def generate_client(tg_id: str):
     }
 
 def get_client_link(client_id, email):
-    return f"vless://{client_id}@45.150.32.79:443?type=tcp&security=reality&pbk=_Al8Epi5BZ5Jj2HmPd5dLoiS_gim1viw0LNbE9DztXc&fp=chrome&sni=github.com&sid=ffffffffff&spx=%2F&flow=xtls-rprx-vision#{email}"
+    return f"vless://{client_id}@45.150.32.79:443?type=tcp&security=reality&pbk=_Al8Epi5BZ5Jj2HmPd5dLoiS_gim1viw0LNbE9DztXc&fp=chrome&sni=yandex.net&sid=ffffffffff&spx=%2F&flow=xtls-rprx-vision#{email}"
 
 def generate_key(user_id, days, tg_id, inbound_id: int = 1):
     if not session.SESSION_KEY:

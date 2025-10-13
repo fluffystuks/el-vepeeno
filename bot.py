@@ -6,7 +6,6 @@ warnings.filterwarnings(
     message=r".*CallbackQueryHandler.*",
     category=PTBUserWarning
 )
-
 import logging
 logging.getLogger("telegram").setLevel(logging.WARNING)
 logging.getLogger("telegram.ext").setLevel(logging.WARNING)
@@ -17,10 +16,8 @@ from telegram.ext import (
     CallbackQueryHandler,
     MessageHandler,
     ConversationHandler,
-    filters,
+    filters
 )
-from telegram import BotCommand, MenuButtonCommands
-
 from config import TELEGRAM_TOKEN
 from db import init_db
 from handlers.start import start
@@ -49,18 +46,20 @@ from handlers.referral import (
     choose_bonus_key,
     apply_bonus_button,
 )
+from handlers.admin import (
+    admin_panel,
+    admin_choose_audience,
+    admin_fix_sni,
+    admin_broadcast_message,
+    admin_cancel,
+    admin_cancel_callback,
+    SELECT_ACTION,
+    WAITING_MESSAGE,
+)
 from services.key_service import login
 from scheduler import start_scheduler
 
-# --- 🔥 админ-панель рассылок ---
-from services.admin_panel import (
-    admin_panel,
-    handle_message_text,
-    choose_target,
-    perform_send,
-    WAITING_MESSAGE,
-    WAITING_TARGET,
-)
+from telegram import BotCommand, MenuButtonCommands
 
 PAYMENT_AMOUNT = 1
 
@@ -77,44 +76,62 @@ payment_conv_handler = ConversationHandler(
             MessageHandler(filters.ALL, timeout_handler)
         ],
     },
-    fallbacks=[CommandHandler("cancel", cancel_handler)],
+    fallbacks=[
+        CommandHandler("cancel", cancel_handler)
+    ],
     allow_reentry=True,
-    conversation_timeout=60
+    conversation_timeout=60  
+)
+
+
+admin_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("admin", admin_panel)],
+    states={
+        SELECT_ACTION: [
+            CallbackQueryHandler(admin_choose_audience, pattern="^admin_broadcast_(all|active)$"),
+            CallbackQueryHandler(admin_fix_sni, pattern="^admin_fix_sni$"),
+            CallbackQueryHandler(admin_cancel_callback, pattern="^admin_cancel$"),
+        ],
+        WAITING_MESSAGE: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, admin_broadcast_message)
+        ],
+    },
+    fallbacks=[CommandHandler("cancel", admin_cancel)],
+    per_message=False,
 )
 
 
 async def post_init(application):
-    """Настройка расписания и меню"""
     await start_scheduler(application)
+
     await application.bot.set_my_commands([
         BotCommand("start", "Запустить бота"),
         BotCommand("pay", "Пополнить баланс"),
         BotCommand("check_payment", "Проверить платёж"),
-        BotCommand("bonuses", "Список бонусов"),
-        BotCommand("admin", "Админ-панель (для администратора)")
+        BotCommand("bonuses", "Список бонусов")
     ])
     await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
 
 def main():
     init_db()
-    login()
+    login()  
 
     application = (
         Application.builder()
         .token(TELEGRAM_TOKEN)
-        .post_init(post_init)
+        .post_init(post_init)  
         .build()
     )
 
-    # 🔹 Основные команды
+    
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(admin_conv_handler)
     application.add_handler(CommandHandler("bonuses", list_bonuses))
     application.add_handler(payment_conv_handler)
     application.add_handler(CommandHandler("check_payment", check_payment_handler))
     application.add_handler(CommandHandler("cancel_payment", cancel_payment_handler))
 
-    # 🔹 Callback-хендлеры
     application.add_handler(CallbackQueryHandler(account_handler, pattern="^account$"))
     application.add_handler(CallbackQueryHandler(rules_handler, pattern="^rules$"))
     application.add_handler(CallbackQueryHandler(extend_key_handler, pattern="^extend_"))
@@ -133,24 +150,7 @@ def main():
     application.add_handler(CallbackQueryHandler(help_handler, pattern="^help$"))
     application.add_handler(CallbackQueryHandler(instruction_handler, pattern="^instruction$"))
 
-    # 🔹 🛠 Админ-панель рассылок
-    admin_conv = ConversationHandler(
-        entry_points=[CommandHandler("admin", admin_panel)],
-        states={
-            WAITING_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_text)],
-            WAITING_TARGET: [
-                CallbackQueryHandler(choose_target, pattern=r"^target:(active|all|cancel)$"),
-                CallbackQueryHandler(perform_send, pattern=r"^target:send$"),
-            ],
-        },
-        fallbacks=[],
-        allow_reentry=True,
-    )
-    application.add_handler(admin_conv)
-
-    # 🚀 Запуск
     application.run_polling()
-
 
 if __name__ == "__main__":
     main()
