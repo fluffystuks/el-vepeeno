@@ -49,6 +49,7 @@ from handlers.referral import (
 from handlers.admin import (
     admin_panel,
     admin_choose_audience,
+    admin_fix_sni,
     admin_broadcast_message,
     admin_cancel,
     admin_cancel_callback,
@@ -88,6 +89,7 @@ admin_conv_handler = ConversationHandler(
     states={
         SELECT_ACTION: [
             CallbackQueryHandler(admin_choose_audience, pattern="^admin_broadcast_(all|active)$"),
+            CallbackQueryHandler(admin_fix_sni, pattern="^admin_fix_sni$"),
             CallbackQueryHandler(admin_cancel_callback, pattern="^admin_cancel$"),
         ],
         WAITING_MESSAGE: [

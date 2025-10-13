@@ -12,6 +12,7 @@ SELECT_ACTION, WAITING_MESSAGE = range(2)
 
 def _build_admin_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
+        [InlineKeyboardButton("🛠️ Обновить SNI и бонус", callback_data="admin_fix_sni")],
         [InlineKeyboardButton("📡 Разослать всем", callback_data="admin_broadcast_all")],
         [InlineKeyboardButton("🛡️ Разослать активным", callback_data="admin_broadcast_active")],
         [InlineKeyboardButton("🚫 Отмена", callback_data="admin_cancel")],
@@ -37,6 +38,70 @@ async def admin_panel(update: Update, context: CallbackContext) -> int:
         await update.callback_query.edit_message_text(text, reply_markup=markup, parse_mode="HTML")
 
     return SELECT_ACTION
+
+
+async def admin_fix_sni(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    if query.from_user.id != ADMIN_TG_ID:
+        await query.answer()
+        return ConversationHandler.END
+
+    await query.answer()
+    await query.edit_message_text("🔄 Запускаю обновление ссылок и продление ключей. Подождите...")
+
+    loop = context.application.loop
+    try:
+        from services.maintenance import replace_sni_and_grant_bonus
+
+        metrics = await loop.run_in_executor(
+            None,
+            lambda: replace_sni_and_grant_bonus("github.com", "yandex.net", 3),
+        )
+    except Exception as exc:
+        await query.edit_message_text(f"❌ Не удалось выполнить операцию: {exc}")
+        return ConversationHandler.END
+
+    notify_ids = metrics.pop("notify_ids", set())
+
+    user_message = (
+        "Привет! Мы обновили VPN-ссылку — теперь вместо github.com используется домен yandex.net.\n\n"
+        "В знак извинений мы автоматически продлили доступ к сервису ещё на 3 дня. Спасибо, что остаётесь с нами! ❤️"
+    )
+
+    sent = 0
+    failed = 0
+    for chat_id in notify_ids:
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=user_message)
+            sent += 1
+        except TelegramError:
+            failed += 1
+
+    summary_lines = [
+        "✅ Операция завершена",
+        f"🔎 Найдено ключей: {metrics.get('keys_found', 0)}",
+        f"🔁 Обновлено ссылок: {metrics.get('links_updated', 0)}",
+        f"⏳ Продлено ключей: {metrics.get('extended_keys', 0)}",
+        f"⚠️ Продлений без ответа API: {metrics.get('extension_api_failures', 0)}",
+        f"🧹 Удалено неактивных ключей: {metrics.get('deleted_inactive', 0)}",
+        f"📬 Сообщений отправлено: {sent}",
+        f"🚫 Ошибок доставки: {failed}",
+    ]
+
+    already = metrics.get("already_up_to_date", 0)
+    if already:
+        summary_lines.insert(3, f"ℹ️ Без изменений: {already}")
+
+    inactive = metrics.get("inactive_updated", 0)
+    if inactive:
+        summary_lines.insert(4, f"🪫 Обновлено для неактивных: {inactive}")
+
+    if metrics.get("invalid_tg_ids"):
+        summary_lines.append(f"❔ Пропущено из-за некорректных TG ID: {metrics['invalid_tg_ids']}")
+
+    await query.edit_message_text("\n".join(summary_lines))
+
+    return ConversationHandler.END
 
 
 async def admin_choose_audience(update: Update, context: CallbackContext) -> int:

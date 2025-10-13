@@ -60,6 +60,50 @@ def init_db():
             conn.commit()
 
 
+def get_keys_with_sni(sni: str):
+    pattern = f"%sni={sni}%"
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT keys.id, keys.user_id, keys.email, keys.key_link,
+                   keys.expiry_time, keys.client_id, keys.active, keys.inbound_id,
+                   users.tg_id
+            FROM keys
+            LEFT JOIN users ON keys.user_id = users.id
+            WHERE keys.key_link LIKE ?
+            """,
+            (pattern,),
+        )
+        rows = cursor.fetchall()
+        result = []
+        for row in rows:
+            result.append(
+                {
+                    "id": row[0],
+                    "user_id": row[1],
+                    "email": row[2],
+                    "key_link": row[3],
+                    "expiry_time": row[4],
+                    "client_id": row[5],
+                    "active": row[6],
+                    "inbound_id": row[7],
+                    "tg_id": row[8],
+                }
+            )
+        return result
+
+
+def update_key_link(key_id: int, link: str):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE keys SET key_link = ? WHERE id = ?",
+            (link, key_id),
+        )
+        conn.commit()
+
+
 def get_key_by_id(key_id: int):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
@@ -331,6 +375,14 @@ def delete_key(key_id: int) -> None:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM keys WHERE id = ?", (key_id,))
         conn.commit()
+
+
+def delete_inactive_keys() -> int:
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM keys WHERE active = 0")
+        conn.commit()
+        return cursor.rowcount
 
 
 def assign_referrer(user_id: int, referrer_id: int) -> bool:
