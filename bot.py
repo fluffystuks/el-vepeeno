@@ -142,7 +142,7 @@ def main():
     application.add_handler(CallbackQueryHandler(check_payment_handler, pattern="^check_payment$"))
     application.add_handler(CallbackQueryHandler(cancel_payment_handler, pattern="^cancel_payment$"))
     application.add_handler(CallbackQueryHandler(connect_handler, pattern="^connect$"))
-    application.add_handler(CallbackQueryHandler(tariff_handler, pattern="^(trial|100rub|250rub|500rub|back)$"))
+    application.add_handler(CallbackQueryHandler(tariff_handler, pattern="^(trial|100rub|back)$"))
     application.add_handler(CallbackQueryHandler(referral_menu, pattern="^referral$"))
     application.add_handler(CallbackQueryHandler(show_bonuses, pattern="^show_bonuses$"))
     application.add_handler(CallbackQueryHandler(choose_bonus_key, pattern="^use_bonus$"))
