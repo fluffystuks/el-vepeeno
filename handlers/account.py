@@ -37,7 +37,8 @@ async def account_handler(update: Update, context: CallbackContext):
             "👤 *Ваш профиль*\n\n"
             f"💰 *Баланс:* {balance} RUB\n\n"
             "Ниже — список ваших ключей.\n"
-            "Нажмите на любой, чтобы посмотреть детали или продлить срок действия ⏳\n\n"
+            "Нажмите на любой, чтобы посмотреть детали.\n\n"
+            "⚠️ Продление и покупки временно недоступны — мы сообщим о возобновлении работы.\n\n"
             "Спасибо, что пользуетесь нашим сервисом! ❤️"
         ),
         parse_mode="Markdown",
@@ -79,11 +80,15 @@ async def show_key_handler(update: Update, context: CallbackContext):
         )
     else:
         keyboard = [
-            [InlineKeyboardButton("⏳ Продлить на 30 дней — 100 RUB", callback_data=f"extend_{key_id}_30")],
-            [InlineKeyboardButton("⏳ Продлить на 60 дней — 180 RUB", callback_data=f"extend_{key_id}_60")],
+            [InlineKeyboardButton("⛔ Продлить на 30 дней — 100 RUB", callback_data=f"extend_{key_id}_30")],
+            [InlineKeyboardButton("⛔ Продлить на 60 дней — 180 RUB", callback_data=f"extend_{key_id}_60")],
             [InlineKeyboardButton("🗑 Удалить ключ", callback_data=f"delete_{key_id}")],
             [InlineKeyboardButton("🔙 Назад", callback_data="account")]
         ]
+        text += (
+            "\n\n⚠️ Продление временно недоступно из-за технических работ.\n"
+            "Мы сообщим, как только сможем возобновить обслуживание."
+        )
     markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(

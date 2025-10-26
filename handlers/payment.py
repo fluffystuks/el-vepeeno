@@ -2,12 +2,17 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKe
 from telegram.ext import CallbackContext, ConversationHandler
 from db import (
     get_or_create_user, has_pending_payment, cancel_pending_payment,
-    save_payment, get_last_payment_id, update_payment_status,
+    get_last_payment_id, update_payment_status,
     update_balance, get_payment_amount
 )
-from services.payment_service import create_payment, check_payment
+from services.payment_service import check_payment
 
 PAYMENT_AMOUNT = 1
+PAYMENT_DISABLED_NOTICE = (
+    "🚧 *Пополнение временно недоступно.*\n\n"
+    "Мы приостановили оплату до восстановления работы сервиса."
+)
+
 
 # ================================================
 # /pay — старт оплаты
@@ -15,89 +20,50 @@ PAYMENT_AMOUNT = 1
 async def pay_handler(update: Update, context: CallbackContext) -> int:
     tg_id = str(update.effective_user.id)
     user_id, _ = get_or_create_user(tg_id)
-    chat_id = update.effective_chat.id
-
+    target = update.callback_query.message if update.callback_query else update.message
 
     if has_pending_payment(user_id):
         markup = InlineKeyboardMarkup([
             [InlineKeyboardButton("❌ Отменить платёж", callback_data="cancel_payment")]
         ])
-
-        if update.message:
-            await update.message.reply_text(
-                "❌ У вас уже есть незавершённый платёж!\n"
-                "Если хотите отменить его и создать новый — нажмите кнопку ниже.",
-                reply_markup=markup
-            )
-        else:
-            await update.callback_query.message.reply_text(
-                "❌ У вас уже есть незавершённый платёж!\n"
-                "Если хотите отменить его и создать новый — нажмите кнопку ниже.",
-                reply_markup=markup
-            )
+        await target.reply_text(
+            PAYMENT_DISABLED_NOTICE
+            + "\n\nУ вас есть незавершённый платёж — при желании вы можете отменить его ниже.",
+            parse_mode="Markdown",
+            reply_markup=markup,
+        )
         return ConversationHandler.END
 
-    if update.message:
-        await update.message.reply_text("Введите сумму пополнения (мин. 50 RUB):")
-    else:
-        await update.callback_query.message.reply_text("Введите сумму пополнения (мин. 50 RUB):")
+    await target.reply_text(PAYMENT_DISABLED_NOTICE, parse_mode="Markdown")
 
-    return PAYMENT_AMOUNT 
+    return ConversationHandler.END
 
 
 # ================================================
 # Ввод суммы
 # ================================================
 async def process_payment_amount(update: Update, context: CallbackContext) -> int:
-    try:
-        amount = float(update.message.text)
-        if amount < 50:
-            await update.message.reply_text("Сумма должна быть не менее 50 RUB.")
-            return PAYMENT_AMOUNT
-
-        tg_id = str(update.message.from_user.id)
-        user_id, _ = get_or_create_user(tg_id)
-        url, payment_id = create_payment(tg_id, amount)
-
-        if not url:
-            await update.message.reply_text("❌ Ошибка создания платежа.")
-            return PAYMENT_AMOUNT
-
-        save_payment(user_id, payment_id, amount)
+    await update.message.reply_text(PAYMENT_DISABLED_NOTICE, parse_mode="Markdown")
+    return ConversationHandler.END
 
 
-        markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("💰 Оплатить", url=url)],
-            [InlineKeyboardButton("✅ Проверить платёж", callback_data="check_payment")]
-        ])
-
-        await update.message.reply_text(
-            f"Перейдите по ссылке для оплаты <b>{amount} RUB</b>:\n\n"
-            "После оплаты нажмите кнопку <b>✅ Проверить платёж</b>\n"
-            "или введите команду <code>/check_payment</code>.",
-            parse_mode="HTML",
-            reply_markup=markup
-        )
-        return ConversationHandler.END
-
-    except ValueError:
-        await update.message.reply_text("Введите корректную сумму.")
-        return PAYMENT_AMOUNT
-
-async def timeout_handler(update, context):
-    await update.message.reply_text(
-        "⌛️ *Время ожидания истекло.*\n\nПопробуйте снова через /pay, когда будете готовы.",
+def _disabled_reply(update):
+    return update.message.reply_text(
+        PAYMENT_DISABLED_NOTICE,
         parse_mode="Markdown",
         reply_markup=ReplyKeyboardRemove()
     )
+
+
+async def timeout_handler(update, context):
+    await _disabled_reply(update)
     return ConversationHandler.END
 
+
 async def cancel_handler(update, context):
-    await update.message.reply_text(
-        "❌ Оплата отменена. Используйте /pay, когда будете готовы.",
-        reply_markup=ReplyKeyboardRemove()
-    )
+    await _disabled_reply(update)
     return ConversationHandler.END
+
 
 # ================================================
 # Проверка оплаты вручную
@@ -134,7 +100,6 @@ async def check_payment_handler(update: Update, context: CallbackContext):
             reply_markup=markup,
         )
 
-
     elif status == "pending":
         markup = InlineKeyboardMarkup([
             [InlineKeyboardButton("❌ Отменить платёж", callback_data="cancel_payment")]
@@ -148,7 +113,7 @@ async def check_payment_handler(update: Update, context: CallbackContext):
 
     elif status == "canceled":
         await target.reply_text(
-            "❌ <b>Платёж был отменён.</b>\nВы можете создать новый через /pay.",
+            "❌ <b>Платёж был отменён.</b>\nПополнение будет доступно после восстановления сервиса.",
             parse_mode="HTML"
         )
     else:
@@ -158,6 +123,7 @@ async def check_payment_handler(update: Update, context: CallbackContext):
             parse_mode="HTML"
         )
 
+
 async def cancel_payment_handler(update: Update, context: CallbackContext):
     tg_id = str(update.effective_user.id)
     user_id, _ = get_or_create_user(tg_id)
@@ -166,9 +132,9 @@ async def cancel_payment_handler(update: Update, context: CallbackContext):
     if update.callback_query:
         await update.callback_query.answer("✅ Платёж отменён!")
         await update.callback_query.edit_message_text(
-            "✅ Ваш платёж отменён.\nТеперь вы можете создать новый через /pay."
+            "✅ Ваш платёж отменён. Ожидайте возобновления сервиса для новых пополнений."
         )
     elif update.message:
         await update.message.reply_text(
-            "✅ Все незавершённые платежи отменены.\nТеперь вы можете создать новый через /pay."
+            "✅ Все незавершённые платежи отменены. Ожидайте возобновления сервиса для новых пополнений."
         )

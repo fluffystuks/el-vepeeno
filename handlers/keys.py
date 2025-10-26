@@ -1,9 +1,13 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
-from db import get_or_create_user, update_balance, add_key, is_trial_used, mark_trial_used
-from handlers.referral import process_purchase
+from db import get_or_create_user, add_key, is_trial_used, mark_trial_used
 from services.key_service import generate_key
 import datetime
+
+PURCHASE_DISABLED_NOTICE = (
+    "🚧 Покупка подписок временно недоступна.\n"
+    "Мы сообщим, когда сервис возобновит работу."
+)
 
 
 async def connect_handler(update: Update, context: CallbackContext):
@@ -17,7 +21,7 @@ async def connect_handler(update: Update, context: CallbackContext):
     keyboard = []
 
     # 🟢 Добавляем пробный только если он ещё не использован
-    
+
     if not trial_used:
         keyboard.append([InlineKeyboardButton("🆓 Пробный — 3 дня", callback_data='trial')])
 
@@ -29,15 +33,16 @@ async def connect_handler(update: Update, context: CallbackContext):
     ]
 
     markup = InlineKeyboardMarkup(keyboard)
-    tg_id = str(query.from_user.id)
     balance = int(get_or_create_user(tg_id)[1])
     await query.edit_message_text(
-    "💡 *Выберите тариф подключения:*\n\n"
-    f"💰 *Ваш баланс:* *{balance} RUB*\n\n"
-    "Все ключи активируются сразу после покупки и готовы к использованию.",
-    parse_mode='Markdown',
-    reply_markup=markup
+        "💡 *Выберите тариф подключения:*\n\n"
+        f"💰 *Ваш баланс:* *{balance} RUB*\n\n"
+        "⚠️ Оплачиваемые тарифы временно недоступны. Пробный ключ работает как обычно.",
+        parse_mode='Markdown',
+        reply_markup=markup
     )
+
+
 async def tariff_handler(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
@@ -70,7 +75,7 @@ async def tariff_handler(update: Update, context: CallbackContext):
             )
             mark_trial_used(user_id)
 
-            expiry_date = datetime.datetime.fromtimestamp(result['expiry_time'] // 1000).strftime('%d.%m.%Y')  # ✅ добавлено
+            expiry_date = datetime.datetime.fromtimestamp(result['expiry_time'] // 1000).strftime('%d.%m.%Y')
 
             await query.edit_message_text(
                 f"🎉 *Пробный ключ активирован!*\n\n"
@@ -88,49 +93,8 @@ async def tariff_handler(update: Update, context: CallbackContext):
             await query.edit_message_text(f"{result}")
         return
 
-    elif choice in prices:
-        price = prices[choice]
-        days = durations[choice]
+    if choice in prices:
+        await query.answer(PURCHASE_DISABLED_NOTICE, show_alert=True)
+        return
 
-        if balance < price:
-            await query.answer(f"❌ Недостаточно средств! Баланс: {balance} RUB.", show_alert=True)
-            return
-
-        update_balance(user_id, balance - price)
-
-        result = generate_key(user_id, days, tg_id)
-        if isinstance(result, dict) and 'email' in result:
-            add_key(
-                user_id,
-                result['email'],
-                result['link'],
-                result['expiry_time'] // 1000,
-                result['client_id'],
-                1,
-            )
-
-            expiry_date = datetime.datetime.fromtimestamp(result['expiry_time'] // 1000).strftime('%d.%m.%Y')
-            new_balance = balance - price
-
-            await query.edit_message_text(
-                f"🎉 *Тариф активирован!* 🎉\n\n"
-                f"📧 *Email:* `{result['email']}`\n"
-                f"🔑 *Ваш ключ:*\n`{result['link']}`\n\n"
-                f"⏳ *Срок действия до:* *{expiry_date}*\n"
-                f"💰 *Новый баланс:* *{new_balance} RUB*\n\n"
-                "⚠️ *Ограничение:* до *2 устройств одновременно*.\n\n"
-                "✅ Скопируйте ключ и вставьте его в приложение VPN.\n"
-                "📜 При необходимости откройте раздел *Инструкция*.\n\n"
-                "Спасибо, что вы с нами! ❤️",
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("🔙 В меню", callback_data="back")]]
-                ),
-            )
-
-            await process_purchase(context, user_id, days, price)
-        else:
-            await query.edit_message_text(
-                f"{result}",
-                parse_mode="Markdown"
-            )
+    await query.answer("❌ Некорректный выбор.", show_alert=True)
